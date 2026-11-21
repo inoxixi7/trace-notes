@@ -71,7 +71,11 @@ struct MapDatumDebugView: View {
       if let loadError = model.loadError {
         Text(verbatim: loadError).foregroundStyle(.red)
       }
-      row("Decision (polygon, per point)", model.decisionSummary)
+      Toggle(isOn: $model.assumeChinaBaseMap) {
+        Text(verbatim: "Assume China base map (D26 input)")
+      }
+      .font(.footnote)
+      row("Decision (D26, per point)", model.decisionSummary)
       row("Device location in mainland", model.deviceInMainlandSummary)
       row("Locale region", model.localeRegion)
       row("MapKit attribution", "read the logo at the map's bottom left")
@@ -81,7 +85,7 @@ struct MapDatumDebugView: View {
     } footer: {
       Text(
         verbatim:
-          "Only the polygon decides. The other rows are evidence for the mainland device test."
+          "D26: convert inside the mainland only when the China base map is served. The other rows are evidence for the mainland device test."
       )
     }
   }
@@ -119,15 +123,24 @@ final class MapDatumDebugModel: NSObject, CLLocationManagerDelegate {
   private(set) var locationError: String?
   var mapSignals = MapDatumDebugMap.Signals()
 
-  @ObservationIgnored private var policy: MapDatumPolicy?
+  /// D26 needs a "China base map served" signal that is not known yet; for the device test the
+  /// page lets you assume either case. On by default so the blue line shows the GCJ-02 candidate.
+  var assumeChinaBaseMap = true {
+    didSet { recompute() }
+  }
+
+  @ObservationIgnored private var mainland: ChinaMainlandRegion?
+  private var policy: MapDatumPolicy? {
+    mainland.map { MapDatumPolicy(mainland: $0, chinaBaseMapServed: assumeChinaBaseMap) }
+  }
   @ObservationIgnored private var manualPoints: [CLLocationCoordinate2D] = []
   @ObservationIgnored private let locationManager = CLLocationManager()
 
   /// Loads the boundary once and follows the device location while the page is visible.
   func start() {
-    if policy == nil, loadError == nil {
+    if mainland == nil, loadError == nil {
       do {
-        policy = MapDatumPolicy(mainland: try ChinaMainlandRegion.bundled())
+        mainland = try ChinaMainlandRegion.bundled()
       } catch {
         loadError = "Boundary data failed to load: \(error)"
       }
@@ -204,8 +217,8 @@ final class MapDatumDebugModel: NSObject, CLLocationManagerDelegate {
   var deviceInMainlandSummary: String {
     if let locationError { return locationError }
     guard let deviceLocation else { return "waiting" }
-    guard let policy else { return "unavailable" }
-    let inside = policy.datum(at: deviceLocation.coordinate) == .gcj02
+    guard let mainland else { return "unavailable" }
+    let inside = mainland.contains(deviceLocation.coordinate)
     return "\(inside ? "yes" : "no") (±\(Int(deviceLocation.horizontalAccuracy)) m)"
   }
 

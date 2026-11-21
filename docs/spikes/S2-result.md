@@ -4,9 +4,11 @@
 > Code: `TraceNotes/MapDatum/` (production modules), `TraceNotesTests/` (unit tests), `TraceNotes/Debug/` (Debug-only page), `Tools/geodata/` (data build scripts).
 > Environment: Xcode 27.0, iOS 26.5 Simulator (iPhone 17 Pro) on a Japanese network, `simctl location` for simulated positions.
 
-## 0. Headline: one observation conflicts with the default rule
+## 0. Headline: one observation conflicted with the default rule → decided as D26
 
-**Stop-and-report item.** Seen from Japan, Apple Maps draws **mainland China in WGS-84**, not GCJ-02.
+> **Decision (2026-11-21): option (b), recorded as D26.** Convert a point only when it is inside mainland China **and** the China base map is being served. Until the mainland device test finds a signal for "China base map served", `MapDatumPolicy` is given `chinaBaseMapServed = false`, so nothing is converted. The Debug page has a toggle to assume either case.
+
+**Stop-and-report item (original report).** Seen from Japan, Apple Maps draws **mainland China in WGS-84**, not GCJ-02.
 
 On the Debug page, the OSM centrelines (WGS-84, red) lie exactly on the roads of the MapKit base map. The converted lines (GCJ-02, blue) sit 480–600 m off:
 
@@ -37,7 +39,7 @@ I did **not** change any rule. `MapDatumPolicy` implements the default rule exac
 - **(a)** keep the default rule as written, accepting a ~500 m offset outside China until the mainland test; or
 - **(b)** amend rule 2 to "convert a mainland point **only when the China base map is being served**". The signal for that is still to be found (§3, §6).
 
-DECISIONS.md is unchanged. I will add an entry once you confirm.
+You chose (b); see D26 in DECISIONS.md.
 
 ## 1. What was built
 
@@ -46,7 +48,7 @@ DECISIONS.md is unchanged. I will add an entry once you confirm.
 | WGS-84 → GCJ-02 transform | `TraceNotes/MapDatum/GCJ02.swift` | Own implementation of the public formula (Krasovsky constants a = 6378245, e² = 0.00669342162296594323). The same algorithm as eviltransform (BSD-2-Clause) and coordtransform (MIT). No code was copied; reference vectors came from their tests and README. Unconditional: it does no "is this in China" check |
 | Mainland region | `TraceNotes/MapDatum/ChinaMainlandRegion.swift` + `china-mainland.bin` (73,520 bytes) | Mainland China **excluding** Hong Kong, Macau and Taiwan-controlled islands (incl. Kinmen), extended ~10 km out to sea. 14 polygons, 9,165 points, int32·1e6 little-endian (format in `Tools/geodata/build_boundary.py`). Lookup: even-odd ray casting over a 0.02° latitude-band edge index. Malformed data throws `LoadError` |
 | Policy | `TraceNotes/MapDatum/MapDatumPolicy.swift` | Default rule, per point. `displayCoordinate(s)(for:)` returns new values and never touches the stored ones |
-| Unit tests | `TraceNotesTests/` (new target, Swift Testing, not hosted, so no app launch and no S1 recorder) | 13 tests / 32 cases, all pass (§5) |
+| Unit tests | `TraceNotesTests/` (new target, Swift Testing, not hosted, so no app launch and no S1 recorder) | 14 tests / 33 cases, all pass (§5) |
 | Debug page | `TraceNotes/Debug/MapDatumDebugView.swift`, `MapDatumPresetRoutes.swift` (generated) | `#if DEBUG` only, as the second tab next to S1. Six preset routes or manual "lat, lon" lines. Red = stored WGS-84, blue = displayed. Shows the signals and the decision. Nothing is logged |
 | Data build scripts | `Tools/geodata/fetch_osm.py`, `build_boundary.py`, `build_routes.py` | Development only. Inputs: Natural Earth 1:10m (public domain), OSM boundary relations for HK/MO and road/rail ways (ODbL). Raw downloads are not committed |
 
@@ -80,7 +82,7 @@ The land border is NE 1:10m everywhere except HK and Macau, which use OSM. Preci
 
 1. **Keep A (polygon, per point) as the only automatic geometric test.** It is correct for "where" and is required under any rule.
 2. **Add an environment condition before converting.** This needs your decision (§0). The candidate is "the China base map is served", derived from B and/or C. Which of the two (or neither) predicts the served map is exactly what the mainland test must find out (§6, M3).
-3. Until then, `MapDatumPolicy` stays on the default rule. The environment condition would become a second input to `MapDatumPolicy`. That is one boolean, with no change to storage or to the per-point logic.
+3. Implemented after D26: `MapDatumPolicy(mainland:chinaBaseMapServed:)`. The environment condition is one boolean, with no change to storage or to the per-point logic. Production passes `false` until the signal is known.
 4. Optionally file a Feedback asking for a MapKit API that exposes the base map datum (H).
 
 How this relates to the default rule: steps 1, 3 and 4 are the default rule unchanged. Step 2 narrows it ("only when the China map is served") and needs your confirmation.
@@ -105,7 +107,7 @@ How this relates to the default rule: steps 1, 3 and 4 are the default rule unch
 | Transform within 1 m of reference: Beijing (2 sources), Shanghai, Shenzhen | Pass (`GCJ02Tests.matchesReference`, 4 cases) |
 | Tokyo, Seoul, New York, Taipei outside; Beijing, Shanghai inside | Pass |
 | Border pairs Lo Wu, Gongbei, Xiamen/Kinmen, Dandong/Sinuiju | Pass (14 cases in `ChinaMainlandRegionTests.classifies`) |
-| Per-point conversion on a crossing track; HK/Macau/Taipei/Tokyo unchanged | Pass (`MapDatumPolicyTests`) |
+| Per-point conversion on a crossing track; HK/Macau/Taipei/Tokyo unchanged; nothing converted when the China base map is not served (D26) | Pass (`MapDatumPolicyTests`) |
 | Loader: bad magic, unknown version, truncated, empty, polygon with hole, non-finite input | Pass |
 | Debug page in simulator: Beijing, Shanghai, HK, Tokyo | Pass (§4) |
 | Debug page absent from Release | Pass. Release binary contains no debug-page strings or symbols (`Map datum`, preset routes, signal labels: 0 hits). Only the empty object file name `MapDatumDebugView.o` appears in the debug-map path table |

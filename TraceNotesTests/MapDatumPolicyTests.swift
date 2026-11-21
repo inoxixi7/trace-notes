@@ -6,7 +6,16 @@ struct MapDatumPolicyTests {
   let policy: MapDatumPolicy
 
   init() throws {
-    policy = MapDatumPolicy(mainland: try ChinaMainlandRegion.bundled())
+    policy = MapDatumPolicy(mainland: try ChinaMainlandRegion.bundled(), chinaBaseMapServed: true)
+  }
+
+  /// D26: without the China base map, mainland points are drawn as stored too.
+  @Test func mainlandPointIsUnchangedWithoutChinaBaseMap() throws {
+    let policy = MapDatumPolicy(mainland: try ChinaMainlandRegion.bundled(), chinaBaseMapServed: false)
+    let beijing = CLLocationCoordinate2D(latitude: 39.911954, longitude: 116.377817)
+    #expect(policy.datum(at: beijing) == .wgs84)
+    let display = policy.displayCoordinate(for: beijing)
+    #expect(display.latitude == beijing.latitude && display.longitude == beijing.longitude)
   }
 
   @Test func mainlandPointIsConverted() {
