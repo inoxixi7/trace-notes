@@ -1,0 +1,98 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "CFBundleDisplayName": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trace Notes"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "軌跡ノート"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "轨迹笔记"
+          }
+        }
+      }
+    },
+    "NSLocationAlwaysAndWhenInUseUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trace Notes records where you go all day, even when the app is closed, so your footprint diary fills itself in. Your location history stays on this iPhone."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "軌跡ノートは、アプリを閉じているあいだも一日を通して移動を記録し、足あとの日記を自動でつけます。位置情報の履歴はこの iPhone の中にだけ保存されます。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "轨迹笔记会全天记录你的行程（即使 App 已关闭），自动生成足迹日记。位置历史只保存在这台 iPhone 上。"
+          }
+        }
+      }
+    },
+    "NSLocationWhenInUseUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trace Notes uses your location to record where you go and show it on your timeline. Your location history stays on this iPhone."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "軌跡ノートは、移動を記録してタイムラインに表示するために位置情報を使用します。位置情報の履歴はこの iPhone の中にだけ保存されます。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "轨迹笔记使用你的位置来记录行程并显示在时间线上。位置历史只保存在这台 iPhone 上。"
+          }
+        }
+      }
+    },
+    "NSMotionUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trace Notes uses motion data to tell walking, cycling, and riding apart, and to recognize likely subway rides. Motion data never leaves this iPhone."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "軌跡ノートは、徒歩・自転車・乗り物の区別や、地下鉄に乗っていたかどうかの推定にモーションデータを使用します。モーションデータがこの iPhone の外に送られることはありません。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "轨迹笔记使用运动数据来区分步行、骑行和乘车，并推测是否在乘坐地铁。运动数据不会离开这台 iPhone。"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

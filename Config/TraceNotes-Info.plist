@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Trace Notes records where you go all day, even when the app is closed, so your footprint diary fills itself in. Your location history stays on this iPhone.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Trace Notes uses your location to record where you go and show it on your timeline. Your location history stays on this iPhone.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Trace Notes uses motion data to tell walking, cycling, and riding apart, and to recognize likely subway rides. Motion data never leaves this iPhone.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
+</dict>
+</plist>
