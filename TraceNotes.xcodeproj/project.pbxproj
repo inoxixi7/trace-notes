@@ -41,11 +41,28 @@
 		0A000000000000000000000A /* TraceNotesWidgets-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "TraceNotesWidgets-Info.plist"; sourceTree = "<group>"; };
 		0A000000000000000000000B /* TraceNotes.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TraceNotes.entitlements; sourceTree = "<group>"; };
 		0A000000000000000000000C /* TraceNotesWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TraceNotesWidgets.entitlements; sourceTree = "<group>"; };
+		0A0000000000000000000046 /* TraceNotesTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TraceNotesTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		0A0000000000000000000045 /* Exceptions for "TraceNotes" folder in "TraceNotesTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				MapDatum/ChinaMainlandRegion.swift,
+				MapDatum/GCJ02.swift,
+				MapDatum/MapDatumPolicy.swift,
+				MapDatum/china-mainland.bin,
+			);
+			target = 0A0000000000000000000050 /* TraceNotesTests */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		0A0000000000000000000004 /* TraceNotes */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				0A0000000000000000000045 /* Exceptions for "TraceNotes" folder in "TraceNotesTests" target */,
+			);
 			path = TraceNotes;
 			sourceTree = "<group>";
 		};
@@ -72,6 +89,11 @@
 			path = "spikes/S1-control-pause/Widget";
 			sourceTree = "<group>";
 		};
+		0A0000000000000000000044 /* TraceNotesTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TraceNotesTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -89,6 +111,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0A0000000000000000000048 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -97,6 +126,7 @@
 			children = (
 				0A0000000000000000000004 /* TraceNotes */,
 				0A0000000000000000000005 /* TraceNotesWidgets */,
+				0A0000000000000000000044 /* TraceNotesTests */,
 				0A0000000000000000000043 /* spikes */,
 				0A0000000000000000000008 /* Config */,
 				0A0000000000000000000003 /* Products */,
@@ -108,6 +138,7 @@
 			children = (
 				0A0000000000000000000006 /* TraceNotes.app */,
 				0A0000000000000000000007 /* TraceNotesWidgets.appex */,
+				0A0000000000000000000046 /* TraceNotesTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -186,6 +217,28 @@
 			productReference = 0A0000000000000000000007 /* TraceNotesWidgets.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		0A0000000000000000000050 /* TraceNotesTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0A000000000000000000004A /* Build configuration list for PBXNativeTarget "TraceNotesTests" */;
+			buildPhases = (
+				0A0000000000000000000047 /* Sources */,
+				0A0000000000000000000048 /* Frameworks */,
+				0A0000000000000000000049 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				0A0000000000000000000044 /* TraceNotesTests */,
+			);
+			name = TraceNotesTests;
+			packageProductDependencies = (
+			);
+			productName = TraceNotesTests;
+			productReference = 0A0000000000000000000046 /* TraceNotesTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -200,6 +253,9 @@
 						CreatedOnToolsVersion = 27.0;
 					};
 					0A0000000000000000000011 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					0A0000000000000000000050 = {
 						CreatedOnToolsVersion = 27.0;
 					};
 				};
@@ -222,6 +278,7 @@
 			targets = (
 				0A0000000000000000000010 /* TraceNotes */,
 				0A0000000000000000000011 /* TraceNotesWidgets */,
+				0A0000000000000000000050 /* TraceNotesTests */,
 			);
 		};
 /* End PBXProject section */
@@ -241,6 +298,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0A0000000000000000000049 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -252,6 +316,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		0A0000000000000000000016 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0A0000000000000000000047 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -520,6 +591,44 @@
 			};
 			name = Release;
 		};
+		0A000000000000000000004B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.inoxixi.tracenotes.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		0A000000000000000000004C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.inoxixi.tracenotes.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -546,6 +655,15 @@
 			buildConfigurations = (
 				0A0000000000000000000034 /* Debug */,
 				0A0000000000000000000035 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		0A000000000000000000004A /* Build configuration list for PBXNativeTarget "TraceNotesTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0A000000000000000000004B /* Debug */,
+				0A000000000000000000004C /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
