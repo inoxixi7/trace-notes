@@ -39,6 +39,8 @@
 		0A0000000000000000000007 /* TraceNotesWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TraceNotesWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		0A0000000000000000000009 /* TraceNotes-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "TraceNotes-Info.plist"; sourceTree = "<group>"; };
 		0A000000000000000000000A /* TraceNotesWidgets-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "TraceNotesWidgets-Info.plist"; sourceTree = "<group>"; };
+		0A000000000000000000000B /* TraceNotes.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TraceNotes.entitlements; sourceTree = "<group>"; };
+		0A000000000000000000000C /* TraceNotesWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TraceNotesWidgets.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -50,6 +52,24 @@
 		0A0000000000000000000005 /* TraceNotesWidgets */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = TraceNotesWidgets;
+			sourceTree = "<group>";
+		};
+		0A0000000000000000000040 /* S1 Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			name = "S1 Shared";
+			path = "spikes/S1-control-pause/Shared";
+			sourceTree = "<group>";
+		};
+		0A0000000000000000000041 /* S1 App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			name = "S1 App";
+			path = "spikes/S1-control-pause/App";
+			sourceTree = "<group>";
+		};
+		0A0000000000000000000042 /* S1 Widget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			name = "S1 Widget";
+			path = "spikes/S1-control-pause/Widget";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -77,6 +97,7 @@
 			children = (
 				0A0000000000000000000004 /* TraceNotes */,
 				0A0000000000000000000005 /* TraceNotesWidgets */,
+				0A0000000000000000000043 /* spikes */,
 				0A0000000000000000000008 /* Config */,
 				0A0000000000000000000003 /* Products */,
 			);
@@ -96,8 +117,20 @@
 			children = (
 				0A0000000000000000000009 /* TraceNotes-Info.plist */,
 				0A000000000000000000000A /* TraceNotesWidgets-Info.plist */,
+				0A000000000000000000000B /* TraceNotes.entitlements */,
+				0A000000000000000000000C /* TraceNotesWidgets.entitlements */,
 			);
 			path = Config;
+			sourceTree = "<group>";
+		};
+		0A0000000000000000000043 /* spikes */ = {
+			isa = PBXGroup;
+			children = (
+				0A0000000000000000000040 /* S1 Shared */,
+				0A0000000000000000000041 /* S1 App */,
+				0A0000000000000000000042 /* S1 Widget */,
+			);
+			name = spikes;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -119,6 +152,8 @@
 			);
 			fileSystemSynchronizedGroups = (
 				0A0000000000000000000004 /* TraceNotes */,
+				0A0000000000000000000040 /* S1 Shared */,
+				0A0000000000000000000041 /* S1 App */,
 			);
 			name = TraceNotes;
 			packageProductDependencies = (
@@ -141,6 +176,8 @@
 			);
 			fileSystemSynchronizedGroups = (
 				0A0000000000000000000005 /* TraceNotesWidgets */,
+				0A0000000000000000000040 /* S1 Shared */,
+				0A0000000000000000000042 /* S1 Widget */,
 			);
 			name = TraceNotesWidgets;
 			packageProductDependencies = (
@@ -364,6 +401,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				CODE_SIGN_ENTITLEMENTS = Config/TraceNotes.entitlements;
 				INFOPLIST_FILE = "Config/TraceNotes-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Trace Notes";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -399,6 +437,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				CODE_SIGN_ENTITLEMENTS = Config/TraceNotes.entitlements;
 				INFOPLIST_FILE = "Config/TraceNotes-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Trace Notes";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -431,6 +470,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
+				CODE_SIGN_ENTITLEMENTS = Config/TraceNotesWidgets.entitlements;
 				INFOPLIST_FILE = "Config/TraceNotesWidgets-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Trace Notes";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -458,6 +498,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
+				CODE_SIGN_ENTITLEMENTS = Config/TraceNotesWidgets.entitlements;
 				INFOPLIST_FILE = "Config/TraceNotesWidgets-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Trace Notes";
 				LD_RUNPATH_SEARCH_PATHS = (

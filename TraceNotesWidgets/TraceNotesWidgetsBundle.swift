@@ -1,9 +1,10 @@
 import SwiftUI
 import WidgetKit
 
-/// Shell for the future Control Widget (F2 pause / resume). No widgets yet.
 @main
 struct TraceNotesWidgetsBundle: WidgetBundle {
     var body: some Widget {
+        // S1 spike control (spikes/S1-control-pause). Remove with the spike.
+        S1RecordingControl()
     }
 }
