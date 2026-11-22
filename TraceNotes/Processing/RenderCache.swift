@@ -26,6 +26,11 @@ nonisolated enum RenderCache {
     return TraceStabilizer.stabilize(TraceStabilizer.spaced(usable), finalize: isComplete).drawableCoordinates.map { ($0.latitude, $0.longitude) }
   }
 
+  /// Metres along a track.
+  static func length(of track: [Coordinate]) -> Double {
+    zip(track, track.dropFirst()).map { MotionStateMachine.distance(from: $0, to: $1) }.reduce(0, +)
+  }
+
   /// Every level for one track, finest first. Each level simplifies the previous one, which makes
   /// coarse levels cheap; the errors add up to at most 4/3 of a level's tolerance.
   static func levels(of track: [Coordinate]) -> [[Coordinate]] {

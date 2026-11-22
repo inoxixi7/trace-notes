@@ -16,7 +16,7 @@ import Foundation
 /// - Segments are cut at local midnight in their own time zone (D30).
 nonisolated struct Segmenter {
   /// Bump when the rules change: stored segments of another version are recomputed (§2.3).
-  static let pipelineVersion = 6
+  static let pipelineVersion = 7
 
   struct Parameters: Sendable {
     /// S3 dwell radius, shared with the recorder's state machine.
@@ -273,12 +273,11 @@ nonisolated struct Segmenter {
     _ segment: Open, day: LocalDay, from start: Date, to end: Date, points: [RawPoint], complete: Bool, continues: Bool
   ) -> Segment {
     let usable = points.filter(isUsable)
-    var distance = 0.0
     var center: Coordinate?
     var radius: Double?
     switch segment.kind {
     case .move:
-      for (a, b) in zip(usable, usable.dropFirst()) { distance += self.distance(a, b) }
+      break  // the processor measures the drawn track (pipeline step ⑦)
     case .stay:
       center = segment.center ?? Self.mean(of: points.map(coordinate(of:)))
       if let center {
@@ -289,7 +288,7 @@ nonisolated struct Segmenter {
     }
     return Segment(
       id: nil, kind: segment.kind, start: start, end: end, timeZoneID: segment.timeZoneID, localDay: day,
-      isComplete: complete, continuesNextDay: continues, pointCount: points.count, distance: distance,
+      isComplete: complete, continuesNextDay: continues, pointCount: points.count, distance: 0,
       centerLatitude: center?.latitude, centerLongitude: center?.longitude, radius: radius,
       pipelineVersion: Self.pipelineVersion)
   }

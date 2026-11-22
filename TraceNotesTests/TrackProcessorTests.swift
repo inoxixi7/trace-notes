@@ -74,4 +74,27 @@ struct TrackProcessorTests {
     try await TrackProcessor(database: database).process(now: points.last!.timestamp)
     #expect(try await summary(database).count == 6)
   }
+
+  /// The timeline's distance is the length of the drawn track, not of the raw points: ±3 m noise on
+  /// a 1 Hz walk would nearly triple the raw length (VS5 simulator finding).
+  @Test func moveDistanceIgnoresGPSNoise() async throws {
+    var generator = SystemRandomNumberGenerator()
+    let walk = (0..<640).map { second -> RawPoint in
+      let noise = { Double.random(in: -3...3, using: &generator) }
+      return helper.point(Double(second), north: Double(second) * 1.4 + noise(), east: noise())
+    }
+    let points = walk + helper.still(from: 640, for: 900, at: 896)
+    let raw = zip(walk, walk.dropFirst())
+      .map { MotionStateMachine.distance(from: ($0.latitude, $0.longitude), to: ($1.latitude, $1.longitude)) }
+      .reduce(0, +)
+    #expect(raw > 1400)
+
+    let database = try openDatabase()
+    try await database.append(points: points, events: [])
+    try await TrackProcessor(database: database).process(now: points.last!.timestamp)
+    var iterator = database.observeSegments(on: LocalDay(year: 2026, month: 11, day: 22)).makeAsyncIterator()
+    let move = try #require(try await iterator.next()?.first { $0.kind == .move })
+    // The walk covers 896 m; the move ends where the stay begins, a little before.
+    #expect(move.distance > 750 && move.distance < 1000, "\(move.distance)")
+  }
 }

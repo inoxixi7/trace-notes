@@ -89,7 +89,7 @@ struct TransportClassifierTests {
     #expect(TransportClassifier.ActivityReading(other) == nil)
   }
 
-  @Test func splitPiecesShareBoundariesAndKeepTheirDistance() throws {
+  @Test func splitPiecesShareBoundaries() throws {
     let points = travel(from: 0, for: 360, metresPerSecond: 1.4, startingAt: 0)
       + travel(from: 360, for: 1200, metresPerSecond: 15, startingAt: 504)
     let move = try #require(helper.segment(points).first)
@@ -97,7 +97,6 @@ struct TransportClassifierTests {
     #expect(pieces.map(\.transportMode) == [.walking, .car])
     #expect(pieces.first?.start == move.start && pieces.last?.end == move.end)
     #expect(pieces[0].end == pieces[1].start)
-    #expect(abs(pieces.map(\.distance).reduce(0, +) - move.distance) < 30)
   }
 
   // MARK: - Overrides

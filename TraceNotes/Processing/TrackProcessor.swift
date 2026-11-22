@@ -62,13 +62,16 @@ nonisolated final class TrackProcessor: Sendable {
     if unmatched > 0 {
       AppLog.processing.notice("\(unmatched) transport-mode overrides match no segment by half their range")
     }
-    // Pipeline step ⑦: completed moves get their simplified levels now; the open one is
-    // simplified in memory by the map while it grows (ARCHITECTURE §5.1).
+    // Pipeline step ⑦: every move's distance is the length of the track the map draws; completed
+    // moves also get their simplified levels now, while the open one is simplified in memory by
+    // the map as it grows (ARCHITECTURE §5.1).
     var renderLevels: [Int: [[RenderCache.Coordinate]]] = [:]
-    for (index, segment) in segments.enumerated() where segment.kind == .move && segment.isComplete {
+    for (index, segment) in segments.enumerated() where segment.kind == .move {
       let track = RenderCache.track(
-        ofMove: input.points.filter { $0.timestamp >= segment.start && $0.timestamp <= segment.end }, isComplete: true)
-      if track.count > 1 { renderLevels[index] = RenderCache.levels(of: track) }
+        ofMove: input.points.filter { $0.timestamp >= segment.start && $0.timestamp <= segment.end },
+        isComplete: segment.isComplete)
+      segments[index].distance = RenderCache.length(of: track)
+      if segment.isComplete, track.count > 1 { renderLevels[index] = RenderCache.levels(of: track) }
     }
     try await database.replaceOpenSegments(with: segments, renderLevels: renderLevels)
   }

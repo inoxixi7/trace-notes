@@ -19,7 +19,8 @@ nonisolated struct Segment: Equatable, Sendable {
   /// Cut at the end of its local day (D30); the next segment continues it.
   var continuesNextDay: Bool
   var pointCount: Int
-  /// Metres along the usable points; moves only.
+  /// Moves only: metres along the track the map draws (stabilized, D34), so the timeline matches
+  /// the line; raw GPS noise would inflate it.
   var distance: Double
   /// WGS-84 centre and the largest distance of a usable point from it; stays only.
   var centerLatitude: Double?

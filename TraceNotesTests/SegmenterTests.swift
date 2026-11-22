@@ -80,7 +80,6 @@ struct SegmenterTests {
     #expect(seconds(stay.end) > 1800 && seconds(stay.end) < 1930)
     let center = try #require(stay.centerLatitude)
     #expect(abs((center - 35) / metre - 840) < 15)
-    #expect(abs(segments[0].distance - seconds(stay.start) * 1.4) < 5)
   }
 
   /// VS2 decision: a pause shorter than 5 minutes stays part of the move.

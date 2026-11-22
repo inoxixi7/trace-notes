@@ -139,8 +139,8 @@ nonisolated enum TransportClassifier {
     }
   }
 
-  /// The move cut into one segment per run, each with its mode. `points` are the raw points of the
-  /// move's range. Pieces share their boundary point (as segments do); only the last piece keeps
+  /// The move cut into one segment per run, each with its mode (distance is left to the processor).
+  /// `points` are the raw points of the move's range. Pieces share their boundary point (as segments do); only the last piece keeps
   /// `continuesNextDay`.
   static func split(_ move: Segment, points: [RawPoint], activities: [ActivityReading], parameters: Parameters = Parameters()) -> [Segment] {
     let own = points.filter { !$0.flags.contains(.replayed) && $0.timestamp >= move.start && $0.timestamp <= move.end }
@@ -149,15 +149,11 @@ nonisolated enum TransportClassifier {
       let start = index == 0 ? move.start : runs[index].start
       let end = index + 1 < runs.count ? runs[index + 1].start : move.end
       let piecePoints = own.filter { $0.timestamp >= start && $0.timestamp <= end }
-      let usable = piecePoints.filter { $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= parameters.maximumDecisionAccuracy }
       var piece = move
       piece.start = start
       piece.end = end
       piece.continuesNextDay = move.continuesNextDay && index == runs.count - 1
       piece.pointCount = piecePoints.count
-      piece.distance = zip(usable, usable.dropFirst())
-        .map { MotionStateMachine.distance(from: ($0.latitude, $0.longitude), to: ($1.latitude, $1.longitude)) }
-        .reduce(0, +)
       piece.transportMode = runs[index].mode
       piece.modeConfidence = runs[index].confidence
       return piece
