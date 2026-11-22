@@ -408,6 +408,20 @@ nonisolated final class AppDatabase: Sendable {
       .values(in: pool)
   }
 
+  /// The local days with at least one stay or move, for the calendar (F8). Read from the
+  /// segments' day index instead of a summary table (VS7, D43); one year is a few thousand rows.
+  func observeRecordedDays() -> AsyncValueObservation<Set<LocalDay>> {
+    ValueObservation
+      .tracking { db in
+        let days = try String.fetchAll(
+          db, sql: "SELECT DISTINCT localDay FROM segments WHERE kind IN (?, ?)",
+          arguments: [Segment.Kind.stay.rawValue, Segment.Kind.move.rawValue])
+        return Set(days.compactMap(LocalDay.init(string:)))
+      }
+      .removeDuplicates()
+      .values(in: pool)
+  }
+
   /// Emits once now and again whenever a point or an event has been appended.
   func observeRawAppends() -> AsyncValueObservation<RawAppendMarker> {
     ValueObservation

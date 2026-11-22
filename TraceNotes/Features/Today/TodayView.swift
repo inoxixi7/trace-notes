@@ -3,12 +3,18 @@ import SwiftUI
 import UIKit
 import os
 
-/// The default screen (F8): today's map, the recording status and the timeline panel.
+/// The main screen (F8): a day's map and timeline panel, with the recording status. It opens on
+/// today; the day bar and the calendar show any other day (VS7, D43).
 struct TodayView: View {
   let database: AppDatabase
   let engine: RecordingEngine
   @Environment(\.scenePhase) private var scenePhase
   @State private var day = LocalDay(.now, in: .current)
+  @State private var today = LocalDay(.now, in: .current)
+  @State private var recordedDays: Set<LocalDay> = []
+  @State private var showsCalendar = false
+  /// When the app last left the screen, to come back to today after a long absence (D43).
+  @State private var backgroundedAt: Date?
   @State private var points: [RawPoint] = []
   @State private var segments: [Segment] = []
   @State private var renderCache: [Int64: [[RenderCache.Coordinate]]] = [:]
@@ -27,21 +33,29 @@ struct TodayView: View {
   private static let half = PresentationDetent.fraction(0.4)
   /// Side margin of the top messages: the 44 pt corner button plus spacing on each side.
   private static let cornerButtonRoom: CGFloat = 16 + 44 + 8
+  /// Away at least this long, the app opens on today again, as on a fresh launch (D43).
+  private static let returnToTodayAfter: TimeInterval = 3600
 
   var body: some View {
     GeometryReader { geometry in
       TodayMapView(
-        segments: segments, points: points, renderCache: renderCache, focus: focus, bottomInset: panelHeight(in: geometry.size.height))
+        day: day, segments: segments, points: points, renderCache: renderCache, focus: focus,
+        bottomInset: panelHeight(in: geometry.size.height))
         .ignoresSafeArea()
     }
     .ignoresSafeArea()
     .overlay(alignment: .top) {
       VStack(spacing: 8) {
         StatusCapsule(status: RecordingStatus(engine: engine), motionDenied: RecordingStatus.motionDenied(engine))
+        DayBar(day: day, today: today, onChange: show) { showsCalendar = true }
         if let loadError {
-          MessageCard(title: Text("Today’s track can’t be shown"), detail: Text(verbatim: loadError))
+          MessageCard(title: Text("The track can’t be shown"), detail: Text(verbatim: loadError))
         } else if hasLoaded, points.isEmpty {
-          MessageCard(title: Text("Nothing recorded today yet"), detail: Text("Your track appears here as you move."))
+          if day == today {
+            MessageCard(title: Text("Nothing recorded today yet"), detail: Text("Your track appears here as you move."))
+          } else {
+            MessageCard(title: Text("Nothing recorded on this day"), detail: Text("Pick another day in the calendar."))
+          }
         }
       }
       // Room for the appearance button on the right, kept on both sides so the capsule stays centred.
@@ -70,11 +84,42 @@ struct TodayView: View {
       await runProcessor()
     }
     .task {
-      // Today changes at local midnight and when the time zone changes.
+      // Today changes at local midnight and when the time zone changes; a screen showing today
+      // follows it, one showing another day stays there (D43).
       for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) {
-        day = LocalDay(.now, in: .current)
+        let wasShowingToday = day == today
+        today = LocalDay(.now, in: .current)
+        if wasShowingToday { show(today) }
       }
     }
+    .task {
+      await observeRecordedDays()
+    }
+    .onChange(of: scenePhase) { _, phase in
+      switch phase {
+      case .background:
+        backgroundedAt = .now
+      case .active:
+        today = LocalDay(.now, in: .current)
+        if let backgroundedAt, Date.now.timeIntervalSince(backgroundedAt) >= Self.returnToTodayAfter { show(today) }
+        backgroundedAt = nil
+      default:
+        break
+      }
+    }
+  }
+
+  /// Switches the screen to another day; nothing from the previous day stays on screen.
+  private func show(_ newDay: LocalDay) {
+    guard newDay != day, newDay <= today else { return }
+    points = []
+    segments = []
+    renderCache = [:]
+    places = [:]
+    hasLoaded = false
+    loadError = nil
+    focus = nil
+    day = newDay
   }
 
   private var timelinePanel: some View {
@@ -88,11 +133,32 @@ struct TodayView: View {
     .sheet(isPresented: $showsDeveloperMenu) {
       DeveloperMenu()
     }
+    .sheet(isPresented: $showsCalendar) { calendar }
     #else
     TimelinePanel(
       segments: segments, places: places, processingError: processingError, onSelect: select, onChangeMode: changeMode,
       onRenamePlace: renamePlace)
+    .sheet(isPresented: $showsCalendar) { calendar }
     #endif
+  }
+
+  /// Presented from the panel: the screen already presents the panel as its sheet.
+  private var calendar: some View {
+    CalendarSheet(day: day, today: today, recordedDays: recordedDays, onPick: show)
+      .presentationDetents([.large])
+  }
+
+  private func observeRecordedDays() async {
+    do {
+      for try await days in database.observeRecordedDays() {
+        recordedDays = days
+      }
+    } catch is CancellationError {
+      // The view went away.
+    } catch {
+      AppLog.processing.error("reading recorded days failed: \(error.localizedDescription, privacy: .public)")
+      processingError = error.localizedDescription
+    }
   }
 
   private struct ProcessingKey: Equatable {

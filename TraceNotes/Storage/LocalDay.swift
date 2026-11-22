@@ -55,6 +55,24 @@ nonisolated struct LocalDay: Hashable, Comparable, Sendable, CustomStringConvert
     return LocalDay(start.addingTimeInterval(36 * 3600), in: .gmt)
   }
 
+  /// The preceding calendar date.
+  var previous: LocalDay {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = .gmt
+    let start = calendar.date(from: DateComponents(year: year, month: month, day: day)) ?? .distantPast
+    return LocalDay(start.addingTimeInterval(-12 * 3600), in: .gmt)
+  }
+
+  /// Gregorian year, month and day, for calendar views.
+  var dateComponents: DateComponents {
+    DateComponents(calendar: Calendar(identifier: .gregorian), year: year, month: month, day: day)
+  }
+
+  init?(_ components: DateComponents) {
+    guard let year = components.year, let month = components.month, let day = components.day else { return nil }
+    self.init(year: year, month: month, day: day)
+  }
+
   /// UTC instants that can belong to this local date in *some* time zone: from the day's start
   /// at UTC+14 to its end at UTC−12. Used to pre-select points by timestamp before filtering by
   /// each point's own zone.

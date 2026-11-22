@@ -35,7 +35,7 @@ struct TimelinePanel: View {
               Button {
                 onSelect(segment)
               } label: {
-                TimelineRow(segment: segment, place: segment.placeID.flatMap { places[$0] })
+                TimelineRow(segment: segment, place: segment.placeID.flatMap { places[$0] }, showsTimeZone: spansTimeZones)
               }
               .buttonStyle(.plain)
               if segment.kind != .stay {
@@ -89,6 +89,11 @@ struct TimelinePanel: View {
 }
 
 extension TimelinePanel {
+  /// A day recorded in more than one time zone labels every row's times with its zone (D43).
+  fileprivate var spansTimeZones: Bool {
+    Set(segments.map(\.timeZoneID)).count > 1
+  }
+
   fileprivate func save(_ name: String?) {
     if let id = renaming?.id { onRenamePlace(id, name) }
     renaming = nil
@@ -98,6 +103,7 @@ extension TimelinePanel {
 private struct TimelineRow: View {
   let segment: Segment
   let place: Place?
+  let showsTimeZone: Bool
 
   var body: some View {
     HStack(spacing: 12) {
@@ -142,14 +148,22 @@ private struct TimelineRow: View {
     }
   }
 
-  /// F8: times in the zone where the segment was recorded.
-  private var timeRange: Text {
-    let style = Date.FormatStyle(date: .omitted, time: .shortened, timeZone: TimeZone(identifier: segment.timeZoneID) ?? .current)
+  /// F8: times in the zone where the segment was recorded, with the zone's short name when the
+  /// day spans zones (D43).
+  private var timeRange: some View {
+    let zone = TimeZone(identifier: segment.timeZoneID) ?? .current
+    let style = Date.FormatStyle(date: .omitted, time: .shortened, timeZone: zone)
     let start = segment.start.formatted(style)
-    if isOngoing {
-      return Text("\(start) – now")
+    return HStack(spacing: 4) {
+      if isOngoing {
+        Text("\(start) – now")
+      } else {
+        Text(verbatim: "\(start) – \(segment.end.formatted(style))")
+      }
+      if showsTimeZone {
+        Text(verbatim: segment.start.formatted(Date.FormatStyle(timeZone: zone).timeZone(.specificName(.short))))
+      }
     }
-    return Text(verbatim: "\(start) – \(segment.end.formatted(style))")
   }
 
   /// The newest stay lasts until now; the recorder saves few points while still (D28).

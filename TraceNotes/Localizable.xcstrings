@@ -45,6 +45,28 @@
         }
       }
     },
+    "Calendar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calendar"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "カレンダー"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日历"
+          }
+        }
+      }
+    },
     "Cancel": {
       "localizations": {
         "en": {
@@ -419,6 +441,28 @@
         }
       }
     },
+    "Next day": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next day"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "次の日"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "后一天"
+          }
+        }
+      }
+    },
     "Next, allow location access “Always” and Motion & Fitness.": {
       "localizations": {
         "en": {
@@ -529,6 +573,28 @@
         }
       }
     },
+    "Nothing recorded on this day": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing recorded on this day"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この日の記録はありません"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这一天没有记录"
+          }
+        }
+      }
+    },
     "Nothing recorded today yet": {
       "localizations": {
         "en": {
@@ -573,6 +639,28 @@
         }
       }
     },
+    "Opens the calendar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens the calendar"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "カレンダーを開きます"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开日历"
+          }
+        }
+      }
+    },
     "Phone off or app not running": {
       "localizations": {
         "en": {
@@ -591,6 +679,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "手机关机或 App 未运行"
+          }
+        }
+      }
+    },
+    "Pick another day in the calendar.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick another day in the calendar."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "カレンダーで別の日を選んでください。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请在日历里选择其他日期。"
           }
         }
       }
@@ -635,6 +745,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "飞机"
+          }
+        }
+      }
+    },
+    "Previous day": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Previous day"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "前の日"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "前一天"
           }
         }
       }
@@ -881,6 +1013,28 @@
         }
       }
     },
+    "The track can’t be shown": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The track can’t be shown"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "軌跡を表示できません"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法显示轨迹"
+          }
+        }
+      }
+    },
     "Timeline": {
       "localizations": {
         "en": {
@@ -903,24 +1057,24 @@
         }
       }
     },
-    "Today’s track can’t be shown": {
+    "Today": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Today’s track can’t be shown"
+            "value": "Today"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "今日の軌跡を表示できません"
+            "value": "今日"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "无法显示今天的轨迹"
+            "value": "今天"
           }
         }
       }

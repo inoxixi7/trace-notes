@@ -6,6 +6,8 @@ import SwiftUI
 /// still never shows as a scribble (F3); each gap is a dashed link (F6, D42). Everything is drawn
 /// in display coordinates (D31).
 struct TodayMapView: UIViewRepresentable {
+  /// The day shown; a new day is framed afresh.
+  let day: LocalDay
   let segments: [Segment]
   /// The day's points, oldest first; the open move takes its points from here by time.
   let points: [RawPoint]
@@ -33,7 +35,7 @@ struct TodayMapView: UIViewRepresentable {
   }
 
   func updateUIView(_ map: MKMapView, context: Context) {
-    context.coordinator.show(segments: segments, points: points, renderCache: renderCache, on: map, bottomInset: bottomInset)
+    context.coordinator.show(day: day, segments: segments, points: points, renderCache: renderCache, on: map, bottomInset: bottomInset)
     if let focus { context.coordinator.move(to: focus, on: map, bottomInset: bottomInset) }
   }
 
@@ -48,6 +50,7 @@ struct TodayMapView: UIViewRepresentable {
     /// The render-cache level the canvas's path was built from.
     private var drawnLevel: Int?
     private var hasFramedDay = false
+    private var shownDay: LocalDay?
     private var shownFocus: UUID?
     private let canvas = TrackCanvas()
     /// Room around framed content, in points (plus the panel's height at the bottom).
@@ -81,7 +84,11 @@ struct TodayMapView: UIViewRepresentable {
       canvas.setTracks(origin.map { tracks.path(atLevel: level, origin: $0) }, origin: origin ?? MKMapPoint(x: 0, y: 0))
     }
 
-    func show(segments: [Segment], points: [RawPoint], renderCache: [Int64: [[RenderCache.Coordinate]]], on map: MKMapView, bottomInset: CGFloat) {
+    func show(day: LocalDay, segments: [Segment], points: [RawPoint], renderCache: [Int64: [[RenderCache.Coordinate]]], on map: MKMapView, bottomInset: CGFloat) {
+      if day != shownDay {
+        shownDay = day
+        hasFramedDay = false
+      }
       var changes: [Date: TrackGeometry.Track?] = [:]
       let wanted = Dictionary(segments.map { ($0.start, $0) }, uniquingKeysWith: { _, newer in newer })
       for (start, entry) in drawn where wanted[start].map({ Self.signature(of: $0) != entry.signature }) ?? true {
