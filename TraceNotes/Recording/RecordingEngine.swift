@@ -28,8 +28,13 @@ final class RecordingEngine: NSObject, CLLocationManagerDelegate {
   @ObservationIgnored private var core: RecordingCore
   @ObservationIgnored private let launchedAt: Date
   @ObservationIgnored private var serviceSession: CLServiceSession?
+  /// Only while authorization is When In Use (D41): it keeps background updates allowed there, at
+  /// the price of the blue status-bar pill. With Always, background updates need no session and
+  /// the live-updates subscription brings the app back after a kill.
   @ObservationIgnored private var backgroundSession: CLBackgroundActivitySession?
   @ObservationIgnored private var diagnosticsTask: Task<Void, Never>?
+  /// Keeps a live-updates subscription open for as long as the process runs (D41).
+  @ObservationIgnored private var liveUpdatesTask: Task<Void, Never>?
   @ObservationIgnored private var appliedConfiguration: LocationConfiguration?
   @ObservationIgnored private var launchClassified = false
   @ObservationIgnored private var motionUpdatesStarted = false
@@ -104,10 +109,13 @@ final class RecordingEngine: NSObject, CLLocationManagerDelegate {
     isRunning = true
     let service = CLServiceSession(authorization: .always)
     serviceSession = service
-    backgroundSession = CLBackgroundActivitySession()
+    updateBackgroundSession()
+    keepLiveUpdatesOpen()
     observeDiagnostics(of: service)
     if authorization == .notDetermined { manager.requestAlwaysAuthorization() }
     manager.allowsBackgroundLocationUpdates = true
+    // No blue status-bar pill while recording with Always (D41; this is also the default).
+    manager.showsBackgroundLocationIndicator = false
     manager.pausesLocationUpdatesAutomatically = false
     manager.startMonitoringSignificantLocationChanges()
     manager.startMonitoringVisits()
@@ -248,6 +256,42 @@ final class RecordingEngine: NSObject, CLLocationManagerDelegate {
     guard manager.authorizationStatus != authorization else { return }
     authorization = manager.authorizationStatus
     enqueue(.authorizationChanged, payload: "status=\(Self.name(authorization))", at: .now)
+    if isRunning { updateBackgroundSession() }
+  }
+
+  /// D41: an open live-updates subscription is what gets the app relaunched in the background
+  /// after the system kills it (simulator: 3 of 3 kills, relaunched within seconds; without it and
+  /// without a background activity session, not within 3 minutes). Its fixes are not used: the
+  /// points still come from the location manager and its sampling strategy (S3).
+  private func keepLiveUpdatesOpen() {
+    liveUpdatesTask = Task {
+      do {
+        for try await _ in CLLocationUpdate.liveUpdates() {}
+        AppLog.recording.error("live updates finished: relaunch after a kill is no longer armed")
+      } catch {
+        AppLog.recording.error("live updates failed: \(error.localizedDescription, privacy: .public)")
+      }
+    }
+  }
+
+  /// D41: a background activity session only for When In Use, where background updates need one
+  /// (and iOS shows the blue pill whatever the app does). With Always, background updates come from
+  /// `allowsBackgroundLocationUpdates` with the indicator off, like other always-on trackers.
+  /// A session for When In Use must be created (or, after a relaunch, resumed) right away; it only
+  /// becomes active in the foreground, which is where the user grants that authorization.
+  private func updateBackgroundSession() {
+    switch authorization {
+    case .authorizedWhenInUse where backgroundSession == nil:
+      backgroundSession = CLBackgroundActivitySession()
+      AppLog.recording.notice("background activity session started (when in use)")
+    case .authorizedAlways, .denied, .restricted:
+      guard let session = backgroundSession else { return }
+      session.invalidate()
+      backgroundSession = nil
+      AppLog.recording.notice("background activity session ended (\(Self.name(self.authorization), privacy: .public))")
+    default:
+      break
+    }
   }
 
   func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
