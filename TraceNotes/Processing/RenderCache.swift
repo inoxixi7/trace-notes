@@ -13,12 +13,17 @@ nonisolated enum RenderCache {
   /// simplification error is invisible (about one pixel on a 2× or 3× screen).
   static let maximumErrorPoints = 0.5
 
-  /// The points drawn for a move: usable ones only (accuracy within the decision limit, not
-  /// replayed). The stabilizer that also removes spikes is a later slice.
-  static func drawablePoints(_ points: [RawPoint], maximumAccuracy: Double = Segmenter.Parameters().maximumDecisionAccuracy) -> [Coordinate] {
-    points
-      .filter { !$0.flags.contains(.replayed) && $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= maximumAccuracy }
-      .map { ($0.latitude, $0.longitude) }
+  /// The track drawn for a move (pipeline steps ② and ⑦'s input): usable points only (accuracy
+  /// within the decision limit, not replayed), thinned to the density the stabilizer was tuned on,
+  /// then stabilized (D34), keeping every point that is not suppressed. A completed move resolves its undecided points; the open move keeps them.
+  static func track(
+    ofMove points: [RawPoint], isComplete: Bool,
+    maximumAccuracy: Double = Segmenter.Parameters().maximumDecisionAccuracy
+  ) -> [Coordinate] {
+    let usable = points.filter {
+      !$0.flags.contains(.replayed) && $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= maximumAccuracy
+    }
+    return TraceStabilizer.stabilize(TraceStabilizer.spaced(usable), finalize: isComplete).drawableCoordinates.map { ($0.latitude, $0.longitude) }
   }
 
   /// Every level for one track, finest first. Each level simplifies the previous one, which makes

@@ -56,7 +56,8 @@ nonisolated final class TrackProcessor: Sendable {
     // simplified in memory by the map while it grows (ARCHITECTURE §5.1).
     var renderLevels: [Int: [[RenderCache.Coordinate]]] = [:]
     for (index, segment) in segments.enumerated() where segment.kind == .move && segment.isComplete {
-      let track = RenderCache.drawablePoints(input.points.filter { $0.timestamp >= segment.start && $0.timestamp <= segment.end })
+      let track = RenderCache.track(
+        ofMove: input.points.filter { $0.timestamp >= segment.start && $0.timestamp <= segment.end }, isComplete: true)
       if track.count > 1 { renderLevels[index] = RenderCache.levels(of: track) }
     }
     try await database.replaceOpenSegments(with: segments, renderLevels: renderLevels)

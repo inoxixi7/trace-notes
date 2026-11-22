@@ -46,10 +46,27 @@ struct GeoTests {
     #expect(RenderCache.level(forMetresPerPoint: 1000) == 4)  // country: coarsest
   }
 
-  @Test func drawablePointsSkipPoorAndReplayedFixes() {
+  @Test func drawnTrackSkipsPoorAndReplayedFixes() {
     let helper = SegmenterTests()
-    let points = [helper.point(0), helper.point(1, accuracy: 300), helper.point(2, flags: .replayed), helper.point(3, north: 5)]
-    #expect(RenderCache.drawablePoints(points).count == 2)
+    let points = [helper.point(0), helper.point(1, accuracy: 300), helper.point(2, flags: .replayed), helper.point(30, north: 40)]
+    // Two points are not enough evidence to decide; the open move still draws them (D34 ④).
+    #expect(RenderCache.track(ofMove: points, isComplete: false).count == 2)
+  }
+
+  /// D34: a GPS spike out and back in the middle of a walk is not drawn. The legacy rule removes a
+  /// one-point jump when the walk returns to within 15 % of the jump's length of where it left.
+  @Test func drawnTrackDropsAnIsolatedSpike() {
+    let helper = SegmenterTests()
+    var points = stride(from: 0.0, to: 120, by: 5).map { helper.point($0, north: $0 * 1.4) }
+    let spikeIndex = points.count / 2
+    points[spikeIndex] = helper.point(points[spikeIndex].timestamp.timeIntervalSince(helper.base), north: Double(spikeIndex) * 7, east: 150, accuracy: 40)
+    let eastMetres = RenderCache.track(ofMove: points, isComplete: true).map { ($0.longitude - 139) / helper.metre * cos(35 * .pi / 180) }
+    #expect(eastMetres.allSatisfy { abs($0) < 10 })
+    #expect(eastMetres.count >= points.count / 2)
+    // While the move is still open the spike is undecided, but the walk has passed it: not drawn
+    // either (simulator finding).
+    let openEast = RenderCache.track(ofMove: points, isComplete: false).map { ($0.longitude - 139) / helper.metre * cos(35 * .pi / 180) }
+    #expect(openEast.allSatisfy { abs($0) < 10 })
   }
 
   // MARK: - Catmull-Rom

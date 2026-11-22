@@ -7,9 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0A0000000000000000000019 /* TraceNotesWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000007 /* TraceNotesWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		0A0000000000000000000073 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 0A0000000000000000000071 /* GRDB */; };
 		0A0000000000000000000074 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 0A0000000000000000000072 /* GRDB */; };
-		0A0000000000000000000019 /* TraceNotesWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000007 /* TraceNotesWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -53,14 +53,19 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Diagnostics/AppLog.swift,
+				Geo/CatmullRom.swift,
+				Geo/DouglasPeucker.swift,
+				"MapDatum/china-mainland.bin",
 				MapDatum/ChinaMainlandRegion.swift,
 				MapDatum/GCJ02.swift,
 				MapDatum/MapDatumPolicy.swift,
-				MapDatum/china-mainland.bin,
-				Geo/CatmullRom.swift,
-				Geo/DouglasPeucker.swift,
 				Processing/RenderCache.swift,
 				Processing/Segmenter.swift,
+				Processing/Stabilizer/MotionState.swift,
+				Processing/Stabilizer/StabilizedTrace.swift,
+				Processing/Stabilizer/TraceExcursionDetector.swift,
+				Processing/Stabilizer/TraceStabilizer.swift,
+				Processing/Stabilizer/TraceStabilizerConfiguration.swift,
 				Processing/TrackProcessor.swift,
 				Recording/EngineStateStore.swift,
 				Recording/MotionStateMachine.swift,
@@ -352,11 +357,11 @@
 				ja,
 				"zh-Hans",
 			);
-			packageReferences = (
-				0A0000000000000000000070 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
-			);
 			mainGroup = 0A0000000000000000000002;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				0A0000000000000000000070 /* XCRemoteSwiftPackageReference "GRDB" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 0A0000000000000000000003 /* Products */;
 			projectDirPath = "";
@@ -569,11 +574,11 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Config/TraceNotes.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				CODE_SIGN_ENTITLEMENTS = Config/TraceNotes.entitlements;
 				INFOPLIST_FILE = "Config/TraceNotes-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Trace Notes";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -605,11 +610,11 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Config/TraceNotes.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				CODE_SIGN_ENTITLEMENTS = Config/TraceNotes.entitlements;
 				INFOPLIST_FILE = "Config/TraceNotes-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Trace Notes";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -639,10 +644,10 @@
 		0A0000000000000000000034 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Config/TraceNotesWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				CODE_SIGN_ENTITLEMENTS = Config/TraceNotesWidgets.entitlements;
 				INFOPLIST_FILE = "Config/TraceNotesWidgets-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Trace Notes";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -667,10 +672,10 @@
 		0A0000000000000000000035 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Config/TraceNotesWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				CODE_SIGN_ENTITLEMENTS = Config/TraceNotesWidgets.entitlements;
 				INFOPLIST_FILE = "Config/TraceNotesWidgets-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Trace Notes";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -845,7 +850,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		0A0000000000000000000070 /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
+		0A0000000000000000000070 /* XCRemoteSwiftPackageReference "GRDB" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/groue/GRDB.swift";
 			requirement = {
@@ -858,12 +863,12 @@
 /* Begin XCSwiftPackageProductDependency section */
 		0A0000000000000000000071 /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 0A0000000000000000000070 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			package = 0A0000000000000000000070 /* XCRemoteSwiftPackageReference "GRDB" */;
 			productName = GRDB;
 		};
 		0A0000000000000000000072 /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 0A0000000000000000000070 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			package = 0A0000000000000000000070 /* XCRemoteSwiftPackageReference "GRDB" */;
 			productName = GRDB;
 		};
 /* End XCSwiftPackageProductDependency section */

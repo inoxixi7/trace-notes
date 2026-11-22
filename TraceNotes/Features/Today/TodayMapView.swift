@@ -19,7 +19,12 @@ struct TodayMapView: UIViewRepresentable {
     let map = MKMapView()
     map.delegate = context.coordinator
     map.showsUserLocation = true
-    map.pointOfInterestFilter = .excludingAll
+    // Muted (near-monochrome) base map, so the coloured track stands out, with increased contrast
+    // so roads and names stay readable (D35).
+    let configuration = MKStandardMapConfiguration(emphasisStyle: .muted)
+    configuration.pointOfInterestFilter = .excludingAll
+    map.preferredConfiguration = configuration
+    map.traitOverrides.accessibilityContrast = .high
     context.coordinator.attach(to: map)
     return map
   }
@@ -107,7 +112,7 @@ struct TodayMapView: UIViewRepresentable {
           // Completed moves come from the render cache; the open one (or one whose cache has not
           // arrived yet) is simplified here.
           let levels = segment.id.flatMap { renderCache[$0] }
-            ?? RenderCache.levels(of: RenderCache.drawablePoints(MapFocus.points(of: segment, in: points)))
+            ?? RenderCache.levels(of: RenderCache.track(ofMove: MapFocus.points(of: segment, in: points), isComplete: segment.isComplete))
           guard let track = TrackGeometry.Track(levels: levels.map { $0.map(DisplayProjection.shared.mapPoint) }) else { continue }
           changes[segment.start] = .some(track)
           drawn[segment.start] = (Self.signature(of: segment), .track(track.boundingRect))
