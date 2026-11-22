@@ -26,13 +26,17 @@ struct RootView: View {
   let database: AppDatabase
   let engine: RecordingEngine
   @AppStorage(Onboarding.completedKey) private var onboardingCompleted = false
+  @AppStorage(Appearance.storageKey) private var appearance = Appearance.system
 
   var body: some View {
-    if onboardingCompleted {
-      TodayView(database: database, engine: engine)
-    } else {
-      OnboardingView(engine: engine) { onboardingCompleted = true }
+    Group {
+      if onboardingCompleted {
+        TodayView(database: database, engine: engine)
+      } else {
+        OnboardingView(engine: engine) { onboardingCompleted = true }
+      }
     }
+    .preferredColorScheme(appearance.colorScheme)
   }
 }
 

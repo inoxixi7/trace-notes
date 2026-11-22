@@ -31,6 +31,10 @@ nonisolated struct RecordingCore: Sendable {
   /// Fixes timestamped before this (the process launch) are cached replays (S3 finding).
   let launchedAt: Date
   private(set) var lastSavedAt: Date?
+  /// While stationary: the newest usable fix within the dwell radius of the stay centre. When the
+  /// stay ends, the skipped fixes from here on are the way out of the place and are saved after
+  /// all (D38), so the track reaches the stay instead of starting 150 m away.
+  private(set) var lastAtPlace: Date?
   private var skipped: SkippedReport?
   private let calendar: Calendar
 
@@ -63,7 +67,13 @@ nonisolated struct RecordingCore: Sendable {
     }
     let report = finishSkippedHour(before: fix.timestamp)
     let wasStationary = machine.state == .stationary
+    if wasStationary, machine.isUsable(fix), let centre = machine.stayCentre,
+      MotionStateMachine.distance(from: centre, to: (fix.latitude, fix.longitude)) <= machine.parameters.dwellRadius
+    {
+      lastAtPlace = fix.timestamp
+    }
     let transition = machine.ingest(fix)
+    if transition?.to == .stationary { lastAtPlace = machine.isUsable(fix) ? fix.timestamp : nil }
     let save: Bool
     if wasStationary, machine.state == .stationary {
       save = lastSavedAt.map { fix.timestamp.timeIntervalSince($0) >= heartbeatInterval } ?? true
@@ -79,7 +89,9 @@ nonisolated struct RecordingCore: Sendable {
   }
 
   mutating func handle(_ motion: MotionStateMachine.Motion, at time: Date) -> MotionStateMachine.Transition? {
-    machine.ingest(motion, at: time)
+    let transition = machine.ingest(motion, at: time)
+    if transition?.to == .stationary { lastAtPlace = nil }
+    return transition
   }
 
   mutating func handleVisitDeparture() -> MotionStateMachine.Transition? {

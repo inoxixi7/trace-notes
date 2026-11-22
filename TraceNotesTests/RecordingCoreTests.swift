@@ -63,6 +63,20 @@ struct RecordingCoreTests {
     #expect(core.state == .moving(.walking))
   }
 
+  /// D38: the heartbeat skips the way out of the place, so the core remembers the last fix that
+  /// was still at the place; the engine saves the skipped fixes from there when the stay ends.
+  @Test func lastFixAtThePlaceMarksTheWayOut() {
+    var core = stationaryCore()
+    #expect(core.lastAtPlace == start.addingTimeInterval(180))
+    #expect(core.handle(fix(200, north: 30)).save == false)  // still within 50 m
+    #expect(core.handle(fix(210, north: 70)).save == false)  // on the way out
+    #expect(core.handle(fix(220, north: 110)).save == false)
+    #expect(core.lastAtPlace == start.addingTimeInterval(200))
+    let outside = core.handle(fix(230, north: 400, speed: 1.4))
+    #expect(outside.transition?.from == .stationary)
+    #expect(core.lastAtPlace == start.addingTimeInterval(200))
+  }
+
   /// A poor fix far away is not credible evidence of leaving (F3), so the heartbeat holds it.
   @Test func poorFixFarAwayDoesNotEndTheStay() {
     var core = stationaryCore()

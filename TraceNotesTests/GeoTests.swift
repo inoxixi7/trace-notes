@@ -94,13 +94,77 @@ struct GeoTests {
     }
   }
 
-  /// D22 / §6.2: a 90° street corner is not rounded off; both spans touching it are straight.
-  @Test func sharpTurnIsDrawnAsACorner() {
+  /// D38: a 90° street corner keeps straight legs and is rounded with a 10 m arc, not a point
+  /// and not a wide swing across the block.
+  @Test func sharpTurnIsRoundedWithASmallArc() {
     let points = [CGPoint(x: 0, y: 0), CGPoint(x: 50, y: 0), CGPoint(x: 100, y: 0), CGPoint(x: 100, y: 50), CGPoint(x: 100, y: 100)]
     let elements = CatmullRom.elements(through: points, metresPerUnit: 1)
-    #expect(elements[2] == .line(to: CGPoint(x: 100, y: 0)))
-    #expect(elements[3] == .line(to: CGPoint(x: 100, y: 50)))
     if case .curve = elements[1] {} else { Issue.record("the span before the corner's neighbour should stay curved") }
+    // Along the leg to the arc's entry (a curve with its controls on the leg).
+    guard case .curve(let entry, let legControl1, let legControl2) = elements[2] else {
+      Issue.record("span to the arc expected")
+      return
+    }
+    #expect(abs(entry.x - 90) < 1e-9 && abs(entry.y) < 1e-9)
+    #expect(abs(legControl1.y) < 1e-9 && abs(legControl2.y) < 1e-9)
+    guard case .curve(let to, let control1, let control2) = elements[3] else {
+      Issue.record("the corner should be an arc")
+      return
+    }
+    #expect(abs(to.x - 100) < 1e-9 && abs(to.y - 10) < 1e-9)
+    // Tangent to both legs: the controls lie on them.
+    #expect(abs(control1.y) < 1e-9 && abs(control2.x - 100) < 1e-9)
+    guard case .curve(let after, let afterControl1, _) = elements[4] else {
+      Issue.record("span after the arc expected")
+      return
+    }
+    #expect(after == CGPoint(x: 100, y: 50) && abs(afterControl1.x - 100) < 1e-9)
+    // The arc passes ≈ 3.5 m inside the corner point: rounded, but still on the street.
+    let flattened = CatmullRom.polyline(through: points, metresPerUnit: 1, tolerance: 0.01)
+    let closest = flattened.map { hypot($0.x - 100, $0.y) }.min() ?? .infinity
+    #expect(closest > 3 && closest < 4.5)
+  }
+
+  /// Device feedback (D39): no kinks at any zoom. At every joint of a jittery walk with sharp
+  /// corners, the curve arrives and leaves in the same direction.
+  @Test func curveHasNoKinks() {
+    let points = [(0, 0), (30, 2), (60, -1), (62, 30), (61, 60), (90, 63), (95, 64), (120, 62), (121, 90)]
+      .map { CGPoint(x: Double($0.0), y: Double($0.1)) }
+    let elements = CatmullRom.elements(through: points, metresPerUnit: 1)
+    var previousEnd = points[0]
+    var incoming: CGPoint?
+    for element in elements.dropFirst() {
+      let (end, firstControl, lastControl): (CGPoint, CGPoint, CGPoint) =
+        switch element {
+        case .move(let to), .line(let to): (to, to, previousEnd)
+        case .curve(let to, let control1, let control2): (to, control1, control2)
+        }
+      let outgoing = CGPoint(x: firstControl.x - previousEnd.x, y: firstControl.y - previousEnd.y)
+      if let incoming, hypot(incoming.x, incoming.y) > 1e-9, hypot(outgoing.x, outgoing.y) > 1e-9 {
+        let cross = incoming.x * outgoing.y - incoming.y * outgoing.x
+        let dot = incoming.x * outgoing.x + incoming.y * outgoing.y
+        #expect(abs(atan2(cross, dot)) < 1e-6, "kink before \(end)")
+      }
+      incoming = CGPoint(x: end.x - lastControl.x, y: end.y - lastControl.y)
+      previousEnd = end
+    }
+  }
+
+  /// Short legs limit the arc to half their length, so neighbouring corners never overlap.
+  @Test func shortLegsShrinkTheArc() {
+    let points = [CGPoint(x: 0, y: 0), CGPoint(x: 40, y: 0), CGPoint(x: 40, y: 12), CGPoint(x: 80, y: 12)]
+    let elements = CatmullRom.elements(through: points, metresPerUnit: 1)
+    guard case .curve(let firstEntry, let control1, let control2) = elements[1] else {
+      Issue.record("span along the leg expected")
+      return
+    }
+    #expect(firstEntry == CGPoint(x: 34, y: 0) && abs(control1.y) < 1e-9 && abs(control2.y) < 1e-9)
+    guard case .curve(let firstExit, _, _) = elements[2] else {
+      Issue.record("arc expected")
+      return
+    }
+    #expect(firstExit == CGPoint(x: 40, y: 6))
+    #expect(elements[3] == .line(to: CGPoint(x: 40, y: 6)))
   }
 
   /// Short legs (GPS jitter) are not corners even when the angle is sharp.

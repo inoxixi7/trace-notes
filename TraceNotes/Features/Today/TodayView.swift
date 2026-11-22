@@ -25,6 +25,8 @@ struct TodayView: View {
   /// Panel heights: a peek showing the first rows, a third of the screen, and full height.
   private static let collapsed = PresentationDetent.height(160)
   private static let half = PresentationDetent.fraction(0.4)
+  /// Side margin of the top messages: the 44 pt corner button plus spacing on each side.
+  private static let cornerButtonRoom: CGFloat = 16 + 44 + 8
 
   var body: some View {
     GeometryReader { geometry in
@@ -42,7 +44,12 @@ struct TodayView: View {
           MessageCard(title: Text("Nothing recorded today yet"), detail: Text("Your track appears here as you move."))
         }
       }
-      .padding(.horizontal)
+      // Room for the appearance button on the right, kept on both sides so the capsule stays centred.
+      .padding(.horizontal, Self.cornerButtonRoom)
+    }
+    .overlay(alignment: .topTrailing) {
+      AppearanceButton()
+        .padding(.trailing)
     }
     .sheet(isPresented: .constant(true)) {
       timelinePanel

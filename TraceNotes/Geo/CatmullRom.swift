@@ -5,8 +5,9 @@ import Foundation
 /// Catmull-Rom spline (α = 0.5, no cusps or self-intersections within a span) expressed as cubic
 /// Bézier spans, so a renderer can hand them straight to Core Graphics.
 ///
-/// At a sharp turn the spline would round the corner off and cut across buildings; there the
-/// spans on both sides of the corner are drawn straight instead.
+/// At a sharp turn the spline would swing wide and cut across buildings; there the spans on both
+/// sides of the corner are drawn straight and the corner itself is rounded with a small arc (D38),
+/// so the line stays on the street without a hard point.
 nonisolated enum CatmullRom {
   enum Element: Equatable {
     case move(to: CGPoint)
@@ -19,6 +20,8 @@ nonisolated enum CatmullRom {
   /// `turnLegMinimumMeters`, LEGACY_INVENTORY §3).
   static let cornerAngleDegrees = 45.0
   static let cornerLegMinimumMetres = 8.0
+  /// Radius of the arc that rounds a corner (D38); shorter legs shrink it to half their length.
+  static let cornerRadiusMetres = 10.0
 
   /// Path elements through `points` (screen or map units). `metresPerUnit` converts their units to
   /// metres for the corner test.
@@ -26,18 +29,27 @@ nonisolated enum CatmullRom {
     guard let first = points.first else { return [] }
     var elements: [Element] = [.move(to: first)]
     guard points.count > 1 else { return elements }
-    let corners = Set(points.indices.dropFirst().dropLast().filter { isCorner(at: $0, in: points, metresPerUnit: metresPerUnit) })
+    let radius = cornerRadiusMetres / metresPerUnit
+    var fillets: [Int: Fillet] = [:]
+    for index in points.indices.dropFirst().dropLast() where isCorner(at: index, in: points, metresPerUnit: metresPerUnit) {
+      fillets[index] = fillet(at: index, in: points, radius: radius)
+    }
+    // Each corner is replaced by its arc's entry and exit; the spans between are Catmull-Rom over
+    // that sequence, with the corner itself as the neighbour beyond an entry or exit. It lies on
+    // the same leg, so each span leaves and meets an arc along the leg and the curve has no kinks.
     for index in 0..<(points.count - 1) {
-      let p1 = points[index]
-      let p2 = points[index + 1]
-      if corners.contains(index) || corners.contains(index + 1) {
-        elements.append(.line(to: p2))
-        continue
+      let start = fillets[index]?.exit ?? points[index]
+      let end = fillets[index + 1]?.entry ?? points[index + 1]
+      if fillets[index] != nil, fillets[index + 1] != nil {
+        elements.append(.line(to: end))  // both on the straight leg between two corners
+      } else {
+        let before = fillets[index] != nil ? points[index] : index > 0 ? (fillets[index - 1]?.exit ?? points[index - 1]) : start
+        let after = fillets[index + 1] != nil ? points[index + 1] : index + 2 < points.count ? (fillets[index + 2]?.entry ?? points[index + 2]) : end
+        elements.append(bezierSpan(before, start, end, after))
       }
-      // The ends are extended by repeating the first and last points.
-      let p0 = index > 0 ? points[index - 1] : p1
-      let p3 = index + 2 < points.count ? points[index + 2] : p2
-      elements.append(bezierSpan(p0, p1, p2, p3))
+      if let next = fillets[index + 1] {
+        elements.append(.curve(to: next.exit, control1: next.control1, control2: next.control2))
+      }
     }
     return elements
   }
@@ -93,6 +105,31 @@ nonisolated enum CatmullRom {
       control2 = p2 + (p1 - p2) / 3
     }
     return .curve(to: p2, control1: control1, control2: control2)
+  }
+
+  /// The arc that rounds a corner: from `entry` on the incoming leg to `exit` on the outgoing one,
+  /// tangent to both (a quadratic Bézier with the corner as control point, written as a cubic).
+  struct Fillet {
+    let entry: CGPoint
+    let exit: CGPoint
+    let control1: CGPoint
+    let control2: CGPoint
+  }
+
+  private static func fillet(at index: Int, in points: [CGPoint], radius: Double) -> Fillet {
+    let corner = points[index]
+    let back = points[index - 1] - corner
+    let ahead = points[index + 1] - corner
+    let backLength = back.length
+    let aheadLength = ahead.length
+    let cosine = -(back.x * ahead.x + back.y * ahead.y) / (backLength * aheadLength)
+    let turn = acos(min(1, max(-1, cosine)))
+    // Tangent length of an arc of `radius` through this turn, at most half of either leg.
+    let tangent = min(radius * tan(min(turn, .pi * 0.999) / 2), backLength / 2, aheadLength / 2)
+    let entry = corner + back / backLength * tangent
+    let exit = corner + ahead / aheadLength * tangent
+    return Fillet(
+      entry: entry, exit: exit, control1: entry + (corner - entry) * (2.0 / 3), control2: exit + (corner - exit) * (2.0 / 3))
   }
 
   private static func isCorner(at index: Int, in points: [CGPoint], metresPerUnit: Double) -> Bool {

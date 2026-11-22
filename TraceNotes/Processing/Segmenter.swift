@@ -9,14 +9,17 @@ import Foundation
 ///   `minimumStay`, where the system reports a visit arrival that then lasts `minimumStay`, or
 ///   where the recorder was silent for longer than `gapInterval` without moving (the stationary
 ///   heartbeat and distance filter save few points, D28).
-/// - A stay ends at the first usable point beyond `stayRadius` (plus its accuracy, as in the
-///   recorder) or at a visit departure.
+/// - A stay is left at the first usable point beyond `stayRadius` (plus its accuracy, as in the
+///   recorder) or at a visit departure. It ends at its last usable point within `dwellRadius` of
+///   its centre, so the way out belongs to the move and is drawn (D38), but never before a silence
+///   of `gapInterval` or more: the recorder was still in its stationary heartbeat then (D28), so
+///   the phone had not left, however far indoor drift put the fix (D39).
 /// - A **gap** is more than `gapInterval` without points *and* a position change beyond the stay
 ///   radius. Its cause is not decided here (VS6).
 /// - Segments are cut at local midnight in their own time zone (D30).
 nonisolated struct Segmenter {
   /// Bump when the rules change: stored segments of another version are recomputed (§2.3).
-  static let pipelineVersion = 7
+  static let pipelineVersion = 9
 
   struct Parameters: Sendable {
     /// S3 dwell radius, shared with the recorder's state machine.
@@ -70,6 +73,8 @@ nonisolated struct Segmenter {
   let parameters: Parameters
   private var open: Open?
   private var freshStart: Date?
+  /// A visit arrival at the resume cursor, seen before the move it belongs to has a point.
+  private var pendingVisitArrival: Date?
   private var lastPoint: RawPoint?
   private var output: [Segment] = []
 
@@ -95,7 +100,11 @@ nonisolated struct Segmenter {
     guard !point.flags.contains(.replayed) else { return }
     defer { lastPoint = point }
     guard let current = open else {
-      startMove(at: freshStart ?? point.timestamp, timeZoneID: point.timeZoneID, points: [point])
+      let start = freshStart ?? point.timestamp
+      startMove(at: start, timeZoneID: point.timeZoneID, points: [])
+      open?.visitArrival = pendingVisitArrival.flatMap { $0 >= start ? $0 : nil }
+      pendingVisitArrival = nil
+      appendToMove(point, usable: isUsable(point))
       return
     }
     if current.kind == .gap {
@@ -133,10 +142,10 @@ nonisolated struct Segmenter {
     switch current.kind {
     case .stay:
       if usable, let center = current.center, isOutside(point, of: center) {
-        let end = lastPoint.map { max($0.timestamp, current.start) } ?? point.timestamp
+        let end = departure(from: current, center: center, leavingAt: point)
         close(at: end)
-        let boundary = lastPoint.flatMap { $0.timestamp >= end ? $0 : nil }
-        startMove(at: end, timeZoneID: point.timeZoneID, points: [boundary, point].compactMap { $0 })
+        let wayOut = current.points.filter { $0.timestamp >= end }
+        startMove(at: end, timeZoneID: point.timeZoneID, points: wayOut + [point])
       } else {
         appendToStay(point, usable: usable)
       }
@@ -149,7 +158,13 @@ nonisolated struct Segmenter {
 
   /// Only visit events matter here; the other kinds explain gaps later (VS6).
   mutating func add(_ event: RecorderEvent) {
-    guard let current = open, event.timestamp >= current.start else { return }
+    guard let current = open else {
+      // Processing resumed at a cursor (often the arrival itself, when the stay it started was
+      // open in the previous run): the move begins with the next point.
+      if event.kind == .visitArrive { pendingVisitArrival = event.timestamp }
+      return
+    }
+    guard event.timestamp >= current.start else { return }
     switch (event.kind, current.kind) {
     case (.visitArrive, .move):
       let center = lastPoint.flatMap { isUsable($0) ? coordinate(of: $0) : nil }
@@ -181,6 +196,20 @@ nonisolated struct Segmenter {
   }
 
   // MARK: - Moves and stays
+
+  /// When the user left `stay`, given the first point outside it.
+  private func departure(from stay: Open, center: Coordinate, leavingAt point: RawPoint) -> Date {
+    var departure = stay.points.lastIndex { isUsable($0) && Self.distance(coordinate(of: $0), center) <= parameters.dwellRadius }
+    // A heartbeat-length silence later on means the phone was still there at the point after it.
+    let following = stay.points.indices.dropFirst((departure ?? -1) + 1)
+    for index in following where index > 0 {
+      if stay.points[index].timestamp.timeIntervalSince(stay.points[index - 1].timestamp) >= parameters.gapInterval {
+        departure = index
+      }
+    }
+    let last = departure.map { stay.points[$0] } ?? lastPoint
+    return last.map { max($0.timestamp, stay.start) } ?? point.timestamp
+  }
 
   private mutating func startMove(at start: Date, timeZoneID: String, points: [RawPoint]) {
     open = Open(kind: .move, start: start, timeZoneID: timeZoneID)

@@ -16,14 +16,19 @@ nonisolated enum RenderCache {
   /// The track drawn for a move (pipeline steps ② and ⑦'s input): usable points only (accuracy
   /// within the decision limit, not replayed), thinned to the density the stabilizer was tuned on,
   /// then stabilized (D34), keeping every point that is not suppressed. A completed move resolves its undecided points; the open move keeps them.
+  ///
+  /// `from` and `to` are the centres of the stays before and after the move: the line starts and
+  /// ends at their markers, so the way into and out of a place has no gap (D38).
   static func track(
-    ofMove points: [RawPoint], isComplete: Bool,
+    ofMove points: [RawPoint], isComplete: Bool, from start: Coordinate? = nil, to end: Coordinate? = nil,
     maximumAccuracy: Double = Segmenter.Parameters().maximumDecisionAccuracy
   ) -> [Coordinate] {
     let usable = points.filter {
       !$0.flags.contains(.replayed) && $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= maximumAccuracy
     }
-    return TraceStabilizer.stabilize(TraceStabilizer.spaced(usable), finalize: isComplete).drawableCoordinates.map { ($0.latitude, $0.longitude) }
+    let stabilized = TraceStabilizer.stabilize(TraceStabilizer.spaced(usable), finalize: isComplete)
+      .drawableCoordinates.map { ($0.latitude, $0.longitude) }
+    return [start].compactMap { $0 } + stabilized + [end].compactMap { $0 }
   }
 
   /// Metres along a track.

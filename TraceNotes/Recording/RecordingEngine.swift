@@ -35,6 +35,9 @@ final class RecordingEngine: NSObject, CLLocationManagerDelegate {
   @ObservationIgnored private var motionUpdatesStarted = false
   @ObservationIgnored private var isLowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
   @ObservationIgnored private let writes: AsyncStream<Write>.Continuation
+  /// Fixes the heartbeat skipped during the current stay, newest last, at most one heartbeat
+  /// interval old: the way out of the place is saved from them when the stay ends (D38).
+  @ObservationIgnored private var skippedWhileStationary: [(location: CLLocation, flags: RawPoint.Flags)] = []
 
   private enum Write {
     case point(RawPoint)
@@ -143,6 +146,14 @@ final class RecordingEngine: NSObject, CLLocationManagerDelegate {
 
   private func apply(_ transition: MotionStateMachine.Transition?) {
     guard let transition else { return }
+    if transition.from == .stationary {
+      // The way out: skipped fixes since the last one at the place (D38).
+      let since = core.lastAtPlace ?? .distantPast
+      for skipped in skippedWhileStationary where skipped.location.timestamp >= since {
+        writes.yield(.point(Self.rawPoint(from: skipped.location, flags: skipped.flags)))
+      }
+    }
+    skippedWhileStationary.removeAll()
     state = transition.to
     AppLog.recording.info(
       "state \(transition.from.name, privacy: .public) -> \(transition.to.name, privacy: .public) reason=\(transition.reason.rawValue, privacy: .public)")
@@ -191,6 +202,10 @@ final class RecordingEngine: NSObject, CLLocationManagerDelegate {
       writes.yield(.point(Self.rawPoint(from: location, flags: decision.flags)))
       // While stationary the heartbeat time must survive a kill too.
       if wasStationary, decision.transition == nil { persistSnapshot() }
+    } else {
+      skippedWhileStationary.append((location, decision.flags))
+      let oldest = location.timestamp.addingTimeInterval(-core.heartbeatInterval)
+      skippedWhileStationary.removeAll { $0.location.timestamp < oldest }
     }
     apply(decision.transition)
   }

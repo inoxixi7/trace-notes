@@ -1,9 +1,9 @@
 import MapKit
 import SwiftUI
 
-/// MKMapView wrapper (D27). Moves are drawn by `TrackOverlay` as smooth curves in screen-pixel
-/// widths from the render cache (VS3); each stay is one marker at its centre, so drift while still
-/// never shows as a scribble (F3). Everything is drawn in display coordinates (D31).
+/// MKMapView wrapper (D27). Moves are drawn by `TrackCanvas` as smooth curves in screen-point
+/// widths from the render cache (VS3, D39); each stay is one dot at its centre, so drift while
+/// still never shows as a scribble (F3). Everything is drawn in display coordinates (D31).
 struct TodayMapView: UIViewRepresentable {
   let segments: [Segment]
   /// The day's points, oldest first; the open move takes its points from here by time.
@@ -25,6 +25,8 @@ struct TodayMapView: UIViewRepresentable {
     configuration.pointOfInterestFilter = .excludingAll
     map.preferredConfiguration = configuration
     map.traitOverrides.accessibilityContrast = .high
+    // The canvas draws the day with one flat map-to-screen transform (D39).
+    map.isPitchEnabled = false
     context.coordinator.attach(to: map)
     return map
   }
@@ -42,11 +44,11 @@ struct TodayMapView: UIViewRepresentable {
     /// What is drawn for each segment, keyed by its start, so unchanged segments are kept.
     private var drawn: [Date: (signature: Signature, item: Drawn)] = [:]
     private var tracks = TrackGeometry()
-    /// The overlays now on the map: the background-coloured outline below the line, and the
-    /// render-cache level they were built from.
-    private var trackOverlays: (casing: MKMultiPolyline, line: MKMultiPolyline, level: Int)?
+    /// The render-cache level the canvas's path was built from.
+    private var drawnLevel: Int?
     private var hasFramedDay = false
     private var shownFocus: UUID?
+    private let canvas = TrackCanvas()
     /// Room around framed content, in points (plus the panel's height at the bottom).
     private static let padding = UIEdgeInsets(top: 120, left: 40, bottom: 40, right: 40)
 
@@ -59,41 +61,23 @@ struct TodayMapView: UIViewRepresentable {
     private enum Drawn {
       /// Lives in `tracks` under the segment's start.
       case track(MKMapRect)
-      case stay(MKPointAnnotation)
+      case stay(MKMapPoint)
     }
-
-    /// Screen points, the same at every zoom level (F7).
-    private static let lineWidth: CGFloat = 5
-    private static let casingWidth: CGFloat = 8
 
     func attach(to map: MKMapView) {
       // Light and dark mode resolve the colours differently (D23).
-      map.registerForTraitChanges([UITraitUserInterfaceStyle.self]) { [weak self] (map: MKMapView, _) in
-        guard let overlays = self?.trackOverlays else { return }
-        for (overlay, isCasing) in [(overlays.casing, true), (overlays.line, false)] {
-          guard let renderer = map.renderer(for: overlay) as? MKMultiPolylineRenderer else { continue }
-          renderer.strokeColor = Self.color(casing: isCasing, on: map)
-          renderer.setNeedsDisplay()
-        }
+      map.registerForTraitChanges([UITraitUserInterfaceStyle.self]) { [canvas] (map: MKMapView, _) in
+        canvas.redraw(on: map)
       }
     }
 
-    /// Replaces the track overlays when the tracks changed or the zoom needs another level.
+    /// Rebuilds the canvas's path when the tracks changed or the zoom needs another level.
     private func redrawTracks(on map: MKMapView, force: Bool) {
       let level = Self.level(on: map)
-      guard force || trackOverlays.map({ $0.level != level }) ?? true else { return }
-      let old = trackOverlays
-      trackOverlays = nil
-      let polylines = tracks.polylines(atLevel: level)
-      if !polylines.isEmpty {
-        let casing = MKMultiPolyline(polylines)
-        let line = MKMultiPolyline(polylines)
-        // Set first: the delegate tells the two apart while they are added. Added in this order at
-        // the same level, the line is drawn over its outline.
-        trackOverlays = (casing, line, level)
-        map.addOverlays([casing, line], level: .aboveRoads)
-      }
-      if let old { map.removeOverlays([old.casing, old.line]) }
+      guard force || drawnLevel != level else { return }
+      drawnLevel = level
+      let origin = tracks.origin
+      canvas.setTracks(origin.map { tracks.path(atLevel: level, origin: $0) }, origin: origin ?? MKMapPoint(x: 0, y: 0))
     }
 
     func show(segments: [Segment], points: [RawPoint], renderCache: [Int64: [[RenderCache.Coordinate]]], on map: MKMapView, bottomInset: CGFloat) {
@@ -102,26 +86,27 @@ struct TodayMapView: UIViewRepresentable {
       for (start, entry) in drawn where wanted[start].map({ Self.signature(of: $0) != entry.signature }) ?? true {
         switch entry.item {
         case .track: changes[start] = .some(nil)
-        case .stay(let marker): map.removeAnnotation(marker)
+        case .stay: break
         }
         drawn[start] = nil
       }
-      for segment in segments where drawn[segment.start] == nil {
+      for (index, segment) in segments.enumerated() where drawn[segment.start] == nil {
         switch segment.kind {
         case .move:
           // Completed moves come from the render cache; the open one (or one whose cache has not
           // arrived yet) is simplified here.
           let levels = segment.id.flatMap { renderCache[$0] }
-            ?? RenderCache.levels(of: RenderCache.track(ofMove: MapFocus.points(of: segment, in: points), isComplete: segment.isComplete))
+            ?? RenderCache.levels(
+              of: RenderCache.track(
+                ofMove: MapFocus.points(of: segment, in: points), isComplete: segment.isComplete,
+                from: index > 0 ? segments[index - 1].stayCenter : nil,
+                to: index + 1 < segments.count ? segments[index + 1].stayCenter : nil))
           guard let track = TrackGeometry.Track(levels: levels.map { $0.map(DisplayProjection.shared.mapPoint) }) else { continue }
           changes[segment.start] = .some(track)
           drawn[segment.start] = (Self.signature(of: segment), .track(track.boundingRect))
         case .stay:
           guard let latitude = segment.centerLatitude, let longitude = segment.centerLongitude else { continue }
-          let marker = MKPointAnnotation()
-          marker.coordinate = DisplayProjection.shared.mapPoint((latitude, longitude)).coordinate
-          map.addAnnotation(marker)
-          drawn[segment.start] = (Self.signature(of: segment), .stay(marker))
+          drawn[segment.start] = (Self.signature(of: segment), .stay(DisplayProjection.shared.mapPoint((latitude, longitude))))
         case .gap:
           continue  // VS6 explains gaps (and draws the dashed subway link)
         }
@@ -130,6 +115,12 @@ struct TodayMapView: UIViewRepresentable {
         tracks.update(changes)
         redrawTracks(on: map, force: true)
       }
+      canvas.setStays(segments.compactMap { segment in
+        guard case .stay(let point)? = drawn[segment.start]?.item else { return nil }
+        return point
+      })
+      canvas.redraw(on: map)
+      canvas.keepAnchorNearCentre(on: map)
 
       // Frame the day once, when everything drawable is drawn (segments can arrive before their
       // points); afterwards the user's own panning and zooming wins.
@@ -151,7 +142,7 @@ struct TodayMapView: UIViewRepresentable {
       let rects = drawn.values.map { entry -> MKMapRect in
         switch entry.item {
         case .track(let rect): rect
-        case .stay(let marker): MapFocus.around(marker.coordinate).rect
+        case .stay(let point): MapFocus.around(point.coordinate).rect
         }
       }
       guard let first = rects.first else { return nil }
@@ -168,14 +159,6 @@ struct TodayMapView: UIViewRepresentable {
       return padding
     }
 
-    /// Opaque colours: the accent for the line, the background colour as its outline, so the
-    /// track reads on both light and dark maps (D23).
-    private static func color(casing: Bool, on map: MKMapView) -> UIColor {
-      casing
-        ? UIColor.systemBackground.resolvedColor(with: map.traitCollection)
-        : map.tintColor.resolvedColor(with: map.traitCollection)
-    }
-
     /// The render-cache level whose simplification stays under half a screen point here.
     private static func level(on map: MKMapView) -> Int {
       let visible = map.visibleMapRect
@@ -185,28 +168,23 @@ struct TodayMapView: UIViewRepresentable {
       return RenderCache.level(forMetresPerPoint: metresPerPoint)
     }
 
-    func mapView(_ mapView: MKMapView, rendererFor overlay: any MKOverlay) -> MKOverlayRenderer {
-      guard let multiPolyline = overlay as? MKMultiPolyline else { return MKOverlayRenderer(overlay: overlay) }
-      let isCasing = multiPolyline === trackOverlays?.casing
-      let renderer = MKMultiPolylineRenderer(multiPolyline: multiPolyline)
-      renderer.strokeColor = Self.color(casing: isCasing, on: mapView)
-      renderer.lineWidth = isCasing ? Self.casingWidth : Self.lineWidth
-      renderer.lineCap = .round
-      renderer.lineJoin = .round
-      return renderer
-    }
-
     func mapViewDidChangeVisibleRegion(_ mapView: MKMapView) {
       redrawTracks(on: mapView, force: false)
+      canvas.mapDidChangeCamera(mapView)
+      canvas.keepAnchorNearCentre(on: mapView)
+    }
+
+    func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+      canvas.mapDidSettle(mapView)
     }
 
     func mapView(_ mapView: MKMapView, viewFor annotation: any MKAnnotation) -> MKAnnotationView? {
-      guard annotation is MKPointAnnotation else { return nil }  // keeps the system user-location view
-      let view = MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: nil)
-      view.markerTintColor = .tintColor
-      view.glyphImage = UIImage(systemName: "mappin")
-      view.displayPriority = .required
-      return view
+      // nil keeps the system user-location view.
+      (annotation as? TrackCanvas.Anchor).map(canvas.view(for:))
+    }
+
+    func mapView(_ mapView: MKMapView, didAdd views: [MKAnnotationView]) {
+      for view in views { canvas.adopt(view, on: mapView) }
     }
   }
 }

@@ -75,9 +75,12 @@ struct SegmenterTests {
     expectContiguous(segments)
     let stay = segments[1]
     // The stay begins where the walk slows into the 50 m dwell window (within ~20 s of arrival)
-    // and ends at the last point inside the stay radius on the way out.
+    // and ends at its last point within the 50 m dwell radius on the way out (D38): the walk
+    // leaves the centre at 1.4 m/s from 1800 s, so about 36 s later.
     #expect(abs(seconds(stay.start) - arrival) <= 30)
-    #expect(seconds(stay.end) > 1800 && seconds(stay.end) < 1930)
+    #expect(seconds(stay.end) > 1800 && seconds(stay.end) < 1845)
+    // The way out (50 m to 150 m) is part of the move, so it is drawn.
+    #expect(segments[2].pointCount > 100)
     let center = try #require(stay.centerLatitude)
     #expect(abs((center - 35) / metre - 840) < 15)
   }
@@ -155,6 +158,18 @@ struct SegmenterTests {
     let segments = segment(points, events: [event(320, .visitArrive)])
     #expect(segments.map(\.kind) == [.move, .stay])
     #expect(seconds(segments[1].start) == 320)
+  }
+
+  /// D39 (device finding): indoors the stationary heartbeat saved fixes that drifted 55 m away.
+  /// The stay still lasts until the last of them, and no second stay follows at the same place.
+  @Test func heartbeatDriftDoesNotEndTheStayEarly() {
+    let points = walk(from: 0, for: 300) + still(from: 300, for: 600, at: 420, drift: 10)
+      + [point(1260, north: 475), point(1620, north: 475)]
+      + walk(from: 1650, for: 300, startingAt: 475)
+    let segments = segment(points)
+    #expect(segments.map(\.kind) == [.move, .stay, .move])
+    #expect(seconds(segments[1].end) == 1620)
+    expectContiguous(segments)
   }
 
   @Test func visitArrivalShorterThanMinimumIsIgnored() {

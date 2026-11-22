@@ -37,6 +37,12 @@ nonisolated struct Segment: Equatable, Sendable {
   /// Stays only: the place it belongs to (F5), assigned when the segment is stored.
   var placeID: Int64? = nil
 
+  /// The marker position of a stay; nil for moves and gaps.
+  var stayCenter: (Double, Double)? {
+    guard kind == .stay, let centerLatitude, let centerLongitude else { return nil }
+    return (centerLatitude, centerLongitude)
+  }
+
   /// What the timeline shows: the user's choice wins (F4).
   var displayedTransportMode: TransportMode? { userTransportMode ?? transportMode }
 

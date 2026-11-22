@@ -35,6 +35,24 @@ struct TrackProcessorTests {
     return rows
   }
 
+  /// D39 (device finding): the run after a visit-started stay resumes at the arrival itself; the
+  /// arrival still starts the stay instead of being dropped (which split it into a 0 m move and a
+  /// later stay).
+  @Test func visitArrivalAtTheResumeCursorKeepsTheStay() async throws {
+    let points = helper.walk(from: 0, for: 300) + helper.still(from: 300, for: 900, at: 420, drift: 70)
+    let database = try openDatabase()
+    let early = points.filter { helper.seconds($0.timestamp) <= 700 }
+    try await database.append(points: early, events: [helper.event(320, .visitArrive)])
+    try await TrackProcessor(database: database).process(now: early.last!.timestamp)
+    #expect(try await summary(database).map { $0.split(separator: " ")[1] } == ["move", "stay"])
+
+    try await database.append(points: Array(points.dropFirst(early.count)), events: [])
+    try await TrackProcessor(database: database).process(now: points.last!.timestamp)
+    let rows = try await summary(database)
+    #expect(rows.map { $0.split(separator: " ")[1] } == ["move", "stay"])
+    #expect(rows.last?.split(separator: " ")[2].hasPrefix("320-") == true)
+  }
+
   @Test func incrementalRunsMatchOneBatchRun() async throws {
     let (points, events) = day()
     let now = points.last!.timestamp
