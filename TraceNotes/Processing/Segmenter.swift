@@ -16,7 +16,7 @@ import Foundation
 /// - Segments are cut at local midnight in their own time zone (D30).
 nonisolated struct Segmenter {
   /// Bump when the rules change: stored segments of another version are recomputed (§2.3).
-  static let pipelineVersion = 2
+  static let pipelineVersion = 3
 
   struct Parameters: Sendable {
     /// S3 dwell radius, shared with the recorder's state machine.

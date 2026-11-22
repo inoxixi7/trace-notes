@@ -11,6 +11,7 @@ struct TodayView: View {
   @State private var day = LocalDay(.now, in: .current)
   @State private var points: [RawPoint] = []
   @State private var segments: [Segment] = []
+  @State private var renderCache: [Int64: [[RenderCache.Coordinate]]] = [:]
   @State private var hasLoaded = false
   @State private var loadError: String?
   @State private var processingError: String?
@@ -26,7 +27,8 @@ struct TodayView: View {
 
   var body: some View {
     GeometryReader { geometry in
-      TodayMapView(segments: segments, points: points, focus: focus, bottomInset: panelHeight(in: geometry.size.height))
+      TodayMapView(
+        segments: segments, points: points, renderCache: renderCache, focus: focus, bottomInset: panelHeight(in: geometry.size.height))
         .ignoresSafeArea()
     }
     .ignoresSafeArea()
@@ -104,6 +106,7 @@ struct TodayView: View {
     await withTaskGroup { group in
       group.addTask { await observePoints(on: day) }
       group.addTask { await observeSegments(on: day) }
+      group.addTask { await observeRenderCache(on: day) }
     }
   }
 
@@ -125,6 +128,18 @@ struct TodayView: View {
     do {
       for try await daySegments in database.observeSegments(on: day) {
         segments = daySegments
+      }
+    } catch is CancellationError {
+      // As above.
+    } catch {
+      processingError = error.localizedDescription
+    }
+  }
+
+  private func observeRenderCache(on day: LocalDay) async {
+    do {
+      for try await cache in database.observeRenderCache(on: day) {
+        renderCache = cache
       }
     } catch is CancellationError {
       // As above.

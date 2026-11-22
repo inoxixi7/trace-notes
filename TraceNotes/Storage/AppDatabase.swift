@@ -93,6 +93,17 @@ nonisolated final class AppDatabase: Sendable {
       try db.create(index: "segments_on_localDay", on: Segment.databaseTableName, columns: ["localDay", "start"])
       try db.create(index: "segments_on_end", on: Segment.databaseTableName, columns: ["end"])
     }
+
+    // VS3: simplified tracks of completed moves (ARCHITECTURE §6.3), removed with their segment.
+    migrator.registerMigration("v3") { db in
+      try db.create(table: RenderCacheEntry.databaseTableName) { table in
+        table.column("segmentID", .integer).notNull()
+          .references(Segment.databaseTableName, onDelete: .cascade)
+        table.column("level", .integer).notNull()
+        table.column("coordinates", .blob).notNull()
+        table.primaryKey(["segmentID", "level"])
+      }
+    }
     return migrator
   }
 
@@ -170,11 +181,34 @@ nonisolated final class AppDatabase: Sendable {
 
   /// Replaces the still-growing segment(s) with `segments`: the ones that completed since the last
   /// run and the new open one.
-  func replaceOpenSegments(with segments: [Segment]) async throws {
+  /// `renderLevels[i]` are the simplification levels of `segments[i]` (completed moves only).
+  func replaceOpenSegments(with segments: [Segment], renderLevels: [Int: [[RenderCache.Coordinate]]] = [:]) async throws {
     try await pool.write { db in
       try Segment.filter(Segment.Columns.isComplete == false).deleteAll(db)
-      for var segment in segments { try segment.insert(db) }
+      for (index, var segment) in segments.enumerated() {
+        try segment.insert(db)
+        guard let levels = renderLevels[index], let segmentID = segment.id else { continue }
+        for (level, coordinates) in levels.enumerated() {
+          try RenderCacheEntry(segmentID: segmentID, level: level, coordinates: coordinates).insert(db)
+        }
+      }
     }
+  }
+
+  /// The render cache of one local day's completed moves: segment ID → levels, finest first.
+  func observeRenderCache(on day: LocalDay) -> AsyncValueObservation<[Int64: [[RenderCache.Coordinate]]]> {
+    ValueObservation
+      .tracking { db in
+        let entries = try RenderCacheEntry
+          .fetchAll(db, sql: """
+            SELECT render_cache.* FROM render_cache
+            JOIN segments ON segments.id = render_cache.segmentID
+            WHERE segments.localDay = ?
+            ORDER BY render_cache.segmentID, render_cache.level
+            """, arguments: [day.description])
+        return Dictionary(grouping: entries, by: \.segmentID).mapValues { $0.map(\.coordinates) }
+      }
+      .values(in: pool)
   }
 
   /// Drops every segment made by another pipeline version; they are rebuilt from the raw layer.

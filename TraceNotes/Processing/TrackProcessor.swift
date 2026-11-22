@@ -51,6 +51,14 @@ nonisolated final class TrackProcessor: Sendable {
       segmenter.add(event)
       nextEvent = events.next()
     }
-    try await database.replaceOpenSegments(with: segmenter.finish(at: now))
+    let segments = segmenter.finish(at: now)
+    // Pipeline step ⑦: completed moves get their simplified levels now; the open one is
+    // simplified in memory by the map while it grows (ARCHITECTURE §5.1).
+    var renderLevels: [Int: [[RenderCache.Coordinate]]] = [:]
+    for (index, segment) in segments.enumerated() where segment.kind == .move && segment.isComplete {
+      let track = RenderCache.drawablePoints(input.points.filter { $0.timestamp >= segment.start && $0.timestamp <= segment.end })
+      if track.count > 1 { renderLevels[index] = RenderCache.levels(of: track) }
+    }
+    try await database.replaceOpenSegments(with: segments, renderLevels: renderLevels)
   }
 }

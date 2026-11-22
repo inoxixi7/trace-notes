@@ -5,4 +5,5 @@ nonisolated enum AppLog {
   static let recording = Logger(subsystem: "com.inoxixi.tracenotes", category: "recording")
   static let storage = Logger(subsystem: "com.inoxixi.tracenotes", category: "storage")
   static let processing = Logger(subsystem: "com.inoxixi.tracenotes", category: "processing")
+  static let rendering = Logger(subsystem: "com.inoxixi.tracenotes", category: "rendering")
 }

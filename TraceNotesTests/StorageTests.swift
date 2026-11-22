@@ -27,8 +27,8 @@ struct StorageTests {
     let (_, url) = try openDatabase()
     let queue = try DatabaseQueue(path: url.path(percentEncoded: false))
     try queue.read { db in
-      #expect(try AppDatabase.migrator.completedMigrations(db) == ["v1", "v2"])
-      #expect(try db.tableExists("segments"))
+      #expect(try AppDatabase.migrator.completedMigrations(db) == ["v1", "v2", "v3"])
+      #expect(try db.tableExists("segments") && db.tableExists("render_cache"))
       #expect(try db.tableExists("raw_points"))
       #expect(try db.tableExists("recorder_events"))
       #expect(try db.indexes(on: "raw_points").contains { $0.columns == ["timestamp"] })

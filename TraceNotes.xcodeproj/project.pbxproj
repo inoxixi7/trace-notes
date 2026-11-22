@@ -57,6 +57,9 @@
 				MapDatum/GCJ02.swift,
 				MapDatum/MapDatumPolicy.swift,
 				MapDatum/china-mainland.bin,
+				Geo/CatmullRom.swift,
+				Geo/DouglasPeucker.swift,
+				Processing/RenderCache.swift,
 				Processing/Segmenter.swift,
 				Processing/TrackProcessor.swift,
 				Recording/EngineStateStore.swift,
@@ -66,6 +69,7 @@
 				Storage/LocalDay.swift,
 				Storage/RawPoint.swift,
 				Storage/RecorderEvent.swift,
+				Storage/RenderCacheEntry.swift,
 				Storage/Segment.swift,
 			);
 			target = 0A0000000000000000000050 /* TraceNotesTests */;
