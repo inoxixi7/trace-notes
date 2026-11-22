@@ -42,6 +42,8 @@
 		0A000000000000000000000B /* TraceNotes.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TraceNotes.entitlements; sourceTree = "<group>"; };
 		0A000000000000000000000C /* TraceNotesWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TraceNotesWidgets.entitlements; sourceTree = "<group>"; };
 		0A0000000000000000000046 /* TraceNotesTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TraceNotesTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		0A0000000000000000000061 /* TraceNotesS3.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TraceNotesS3.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		0A000000000000000000006A /* TraceNotesS3-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "TraceNotesS3-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -52,6 +54,14 @@
 				MapDatum/GCJ02.swift,
 				MapDatum/MapDatumPolicy.swift,
 				MapDatum/china-mainland.bin,
+			);
+			target = 0A0000000000000000000050 /* TraceNotesTests */;
+		};
+		0A000000000000000000006B /* Exceptions for "S3 Core" folder in "TraceNotesTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				S3DayStats.swift,
+				S3MotionStateMachine.swift,
 			);
 			target = 0A0000000000000000000050 /* TraceNotesTests */;
 		};
@@ -94,6 +104,21 @@
 			path = TraceNotesTests;
 			sourceTree = "<group>";
 		};
+		0A0000000000000000000068 /* S3 Core */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				0A000000000000000000006B /* Exceptions for "S3 Core" folder in "TraceNotesTests" target */,
+			);
+			name = "S3 Core";
+			path = "spikes/S3-sampling/Core";
+			sourceTree = "<group>";
+		};
+		0A0000000000000000000069 /* S3 App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			name = "S3 App";
+			path = "spikes/S3-sampling/App";
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -112,6 +137,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		0A0000000000000000000048 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0A0000000000000000000063 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -139,6 +171,7 @@
 				0A0000000000000000000006 /* TraceNotes.app */,
 				0A0000000000000000000007 /* TraceNotesWidgets.appex */,
 				0A0000000000000000000046 /* TraceNotesTests.xctest */,
+				0A0000000000000000000061 /* TraceNotesS3.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -150,6 +183,7 @@
 				0A000000000000000000000A /* TraceNotesWidgets-Info.plist */,
 				0A000000000000000000000B /* TraceNotes.entitlements */,
 				0A000000000000000000000C /* TraceNotesWidgets.entitlements */,
+				0A000000000000000000006A /* TraceNotesS3-Info.plist */,
 			);
 			path = Config;
 			sourceTree = "<group>";
@@ -160,6 +194,8 @@
 				0A0000000000000000000040 /* S1 Shared */,
 				0A0000000000000000000041 /* S1 App */,
 				0A0000000000000000000042 /* S1 Widget */,
+				0A0000000000000000000068 /* S3 Core */,
+				0A0000000000000000000069 /* S3 App */,
 			);
 			name = spikes;
 			sourceTree = "<group>";
@@ -239,6 +275,29 @@
 			productReference = 0A0000000000000000000046 /* TraceNotesTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		0A0000000000000000000060 /* TraceNotesS3 */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0A0000000000000000000065 /* Build configuration list for PBXNativeTarget "TraceNotesS3" */;
+			buildPhases = (
+				0A0000000000000000000062 /* Sources */,
+				0A0000000000000000000063 /* Frameworks */,
+				0A0000000000000000000064 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				0A0000000000000000000068 /* S3 Core */,
+				0A0000000000000000000069 /* S3 App */,
+			);
+			name = TraceNotesS3;
+			packageProductDependencies = (
+			);
+			productName = TraceNotesS3;
+			productReference = 0A0000000000000000000061 /* TraceNotesS3.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -256,6 +315,9 @@
 						CreatedOnToolsVersion = 27.0;
 					};
 					0A0000000000000000000050 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					0A0000000000000000000060 = {
 						CreatedOnToolsVersion = 27.0;
 					};
 				};
@@ -279,6 +341,7 @@
 				0A0000000000000000000010 /* TraceNotes */,
 				0A0000000000000000000011 /* TraceNotesWidgets */,
 				0A0000000000000000000050 /* TraceNotesTests */,
+				0A0000000000000000000060 /* TraceNotesS3 */,
 			);
 		};
 /* End PBXProject section */
@@ -305,6 +368,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0A0000000000000000000064 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -323,6 +393,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		0A0000000000000000000047 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0A0000000000000000000062 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -629,6 +706,70 @@
 			};
 			name = Release;
 		};
+		0A0000000000000000000066 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/TraceNotesS3-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "TN S3";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.inoxixi.tracenotes.s3;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		0A0000000000000000000067 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/TraceNotesS3-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "TN S3";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.inoxixi.tracenotes.s3;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -664,6 +805,15 @@
 			buildConfigurations = (
 				0A000000000000000000004B /* Debug */,
 				0A000000000000000000004C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		0A0000000000000000000065 /* Build configuration list for PBXNativeTarget "TraceNotesS3" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0A0000000000000000000066 /* Debug */,
+				0A0000000000000000000067 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

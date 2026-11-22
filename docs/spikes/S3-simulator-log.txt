@@ -1,0 +1,182 @@
+S3 simulator log excerpt (iPhone 17 Pro simulator, iOS 26.5, 2026-11-21/22).
+Source: Documents/s3-events.log of TN S3, Debug build. Lines carry no coordinates by design.
+No Core Motion in the simulator (motion.unavailable); activity comes from GPS speed.
+Segment summaries were computed by a test-harness script from the log and the scenario marks.
+kCLErrorDomain error 0 = kCLErrorLocationUnknown: the simulator gives no new fix at a fixed location.
+
+############ Round 1 · Apple routes: still 240 s (fixed location) → City Run 300 s → Freeway Drive 240 s → fixed location 240 s
+== A-systemLive still-start  (240 s)
+   points=1 first_after=4s longest_gap=-s
+== A-systemLive cityrun-start  (300 s)
+   points=302 first_after=1s longest_gap=1s
+   23:23:28 state moving.unknown -> moving.cycling reason=activity app=background
+   23:23:28 sampling.apply trigger=transition strategy=A-systemLive state=moving.cycling live=fitness
+== A-systemLive freeway-start  (241 s)
+   points=242 first_after=1s longest_gap=1s
+   23:28:28 state moving.cycling -> moving.walking reason=activity app=active
+   23:28:28 sampling.apply trigger=transition strategy=A-systemLive state=moving.walking live=fitness
+   23:28:38 state moving.walking -> moving.automotive reason=activity app=active
+   23:28:38 sampling.apply trigger=transition strategy=A-systemLive state=moving.automotive live=otherNavigation
+== A-systemLive stop-start  (240 s)
+   points=2 first_after=0s longest_gap=0s
+== B-tieredAccuracy still-start  (241 s)
+   points=0 first_after=Nones longest_gap=-s
+== B-tieredAccuracy cityrun-start  (300 s)
+   points=300 first_after=0s longest_gap=1s
+   23:41:32 state moving.unknown -> moving.cycling reason=activity app=background
+   23:41:32 sampling.apply trigger=transition strategy=B-tieredAccuracy state=moving.cycling stream acc=10m filter=none type=3
+== B-tieredAccuracy freeway-start  (240 s)
+   points=241 first_after=0s longest_gap=1s
+   23:46:27 manager.error stream The operation couldn’t be completed. (kCLErrorDomain error 0.)
+   23:46:31 state moving.cycling -> moving.walking reason=activity app=background
+   23:46:31 sampling.apply trigger=transition strategy=B-tieredAccuracy state=moving.walking stream acc=10m filter=none type=3
+   23:46:41 state moving.walking -> moving.automotive reason=activity app=background
+   23:46:41 sampling.apply trigger=transition strategy=B-tieredAccuracy state=moving.automotive stream acc=10m filter=none type=4
+== B-tieredAccuracy stop-start  (240 s)
+   points=2 first_after=1s longest_gap=0s
+   23:50:27 manager.error stream The operation couldn’t be completed. (kCLErrorDomain error 0.)
+== C-geofenceSleep still-start  (240 s)
+   points=0 first_after=Nones longest_gap=-s
+== C-geofenceSleep cityrun-start  (300 s)
+   points=300 first_after=0s longest_gap=1s
+   23:58:41 state moving.unknown -> moving.cycling reason=activity app=background
+   23:58:41 sampling.apply trigger=transition strategy=C-geofenceSleep state=moving.cycling stream acc=10m filter=none type=3
+== C-geofenceSleep freeway-start  (240 s)
+   points=241 first_after=0s longest_gap=1s
+   00:03:36 manager.error stream The operation couldn’t be completed. (kCLErrorDomain error 0.)
+   00:03:40 state moving.cycling -> moving.walking reason=activity app=active
+   00:03:40 sampling.apply trigger=transition strategy=C-geofenceSleep state=moving.walking stream acc=10m filter=none type=3
+   00:03:50 state moving.walking -> moving.automotive reason=activity app=active
+   00:03:50 sampling.apply trigger=transition strategy=C-geofenceSleep state=moving.automotive stream acc=10m filter=none type=4
+== C-geofenceSleep stop-start  (240 s)
+   points=2 first_after=1s longest_gap=0s
+   00:07:36 manager.error stream The operation couldn’t be completed. (kCLErrorDomain error 0.)
+
+############ Round 2 · Dwell: walk 150 m → stay within 8 m for 320 s (fixes keep coming) → walk 300 m away. App in background unless 'fg'.
+(B's first dwell run was relaunched by Core Location without the harness' launch arguments and ran C; it is shown as the C background run.)
+== A-systemLive walkout-start  (111 s)
+   points=112 first_after=1s longest_gap=1s
+   00:11:49 state moving.unknown -> moving.walking reason=activity app=background
+   00:11:49 sampling.apply trigger=transition strategy=A-systemLive state=moving.walking live=fitness
+== A-systemLive dwell-start  (320 s)
+   points=319 first_after=0s longest_gap=1s
+   00:16:42 state moving.walking -> stationary reason=dwell app=background
+   00:16:42 sampling.apply trigger=transition strategy=A-systemLive state=stationary live=default
+== A-systemLive leave-start  (220 s)
+   points=220 first_after=1s longest_gap=1s
+   00:20:44 state stationary -> moving.walking reason=displacement app=background
+   00:20:44 sampling.apply trigger=transition strategy=A-systemLive state=moving.walking live=fitness
+== C-geofenceSleep(bg) walkout-start  (110 s)
+   points=109 first_after=1s longest_gap=1s
+   00:22:47 state moving.unknown -> moving.walking reason=activity app=background
+   00:22:47 sampling.apply trigger=transition strategy=C-geofenceSleep state=moving.walking stream acc=10m filter=none type=3
+== C-geofenceSleep(bg) dwell-start  (321 s)
+   points=187 first_after=1s longest_gap=1s
+   00:24:33 manager.error stream The operation couldn’t be completed. (kCLErrorDomain error 0.)
+   00:27:40 state moving.walking -> stationary reason=dwell app=background
+   00:27:40 sampling.apply trigger=transition strategy=C-geofenceSleep state=stationary stream=off geofence=150m
+   00:27:40 geofence.add radius=150m
+== C-geofenceSleep(bg) leave-start  (220 s)
+   points=0 first_after=Nones longest_gap=-s
+== B-tieredAccuracy walkout-start  (110 s)
+   points=109 first_after=1s longest_gap=1s
+   00:45:50 state moving.unknown -> moving.walking reason=activity app=background
+   00:45:50 sampling.apply trigger=transition strategy=B-tieredAccuracy state=moving.walking stream acc=10m filter=none type=3
+   00:45:50 geofence.remove
+== B-tieredAccuracy dwell-start  (320 s)
+   points=187 first_after=0s longest_gap=1s
+   00:47:36 manager.error stream The operation couldn’t be completed. (kCLErrorDomain error 0.)
+   00:50:43 state moving.walking -> stationary reason=dwell app=background
+   00:50:43 sampling.apply trigger=transition strategy=B-tieredAccuracy state=stationary stream acc=100m filter=25m type=1
+== B-tieredAccuracy leave-start  (221 s)
+   points=117 first_after=1s longest_gap=18s
+   00:52:57 manager.error stream The operation couldn’t be completed. (kCLErrorDomain error 0.)
+   00:54:45 state stationary -> moving.walking reason=displacement app=background
+   00:54:45 sampling.apply trigger=transition strategy=B-tieredAccuracy state=moving.walking stream acc=10m filter=none type=3
+== C-geofenceSleep fg walkout-start  (111 s)
+   points=110 first_after=1s longest_gap=1s
+   00:56:49 state moving.unknown -> moving.walking reason=activity app=active
+   00:56:49 sampling.apply trigger=transition strategy=C-geofenceSleep state=moving.walking stream acc=10m filter=none type=3
+== C-geofenceSleep dwell-start  (320 s)
+   points=186 first_after=0s longest_gap=1s
+   00:58:36 manager.error stream The operation couldn’t be completed. (kCLErrorDomain error 0.)
+   01:01:42 state moving.walking -> stationary reason=dwell app=active
+   01:01:42 sampling.apply trigger=transition strategy=C-geofenceSleep state=stationary stream=off geofence=150m
+   01:01:42 geofence.add radius=150m
+== C-geofenceSleep leave-start  (220 s)
+   points=0 first_after=Nones longest_gap=-s
+
+############ Round 2 raw lines, C foreground dwell run (non-point lines). The first line is a cached fix replayed on launch with its old timestamp.
+2026-11-22T00:56:37.610+0900 pt src=stream acc=5m bucket=≤10m saved=true poor=false state=moving.walking app=background
+2026-11-22T00:56:41.179+0900 app.launch state=background armed=true paused=false strategy=C-geofenceSleep auth=always lowPower=false
+2026-11-22T00:56:41.180+0900 session.start trigger=launch state=background
+2026-11-22T00:56:41.180+0900 motion.unavailable
+2026-11-22T00:56:41.181+0900 sampling.apply trigger=launch strategy=C-geofenceSleep state=moving.unknown stream acc=10m filter=none type=3
+2026-11-22T00:56:41.184+0900 auth.change auth=always
+2026-11-22T00:56:41.232+0900 manager.error stream The operation couldn’t be completed. (kCLErrorDomain error 0.)
+2026-11-22T00:56:41.632+0900 scene.phase active
+2026-11-22T00:56:49.974+0900 state moving.unknown -> moving.walking reason=activity app=active
+2026-11-22T00:56:49.974+0900 sampling.apply trigger=transition strategy=C-geofenceSleep state=moving.walking stream acc=10m filter=none type=3
+2026-11-22T00:58:36.268+0900 manager.error stream The operation couldn’t be completed. (kCLErrorDomain error 0.)
+2026-11-22T01:00:00.864+0900 hour.summary hour=0 points=1988 state=moving.walking
+2026-11-22T01:01:42.601+0900 state moving.walking -> stationary reason=dwell app=active
+2026-11-22T01:01:42.602+0900 sampling.apply trigger=transition strategy=C-geofenceSleep state=stationary stream=off geofence=150m
+2026-11-22T01:01:42.633+0900 geofence.add radius=150m
+... then nothing at all for the 220 s walk away: no geofence.event, no visit, no slc, no pt.
+
+############ Before the replay fix: the same significant-change fix replayed on 9 launches, each logged at its own old timestamp
+2026-11-21T23:03:12.027+0900 pt src=slc acc=5m bucket=≤10m saved=true poor=false state=moving.unknown app=inactive
+2026-11-21T23:03:12.027+0900 pt src=slc acc=5m bucket=≤10m saved=true poor=false state=moving.unknown app=background
+2026-11-21T23:03:12.027+0900 pt src=slc acc=5m bucket=≤10m saved=true poor=false state=moving.unknown app=background
+
+############ Round 3 · after the fixes, B dwell (A's run in this round was frozen by a Mac sleep and is not used)
+== B-tieredAccuracy walkout-start  (110 s)
+   points=109 first_after=1s longest_gap=1s
+   09:40:45 state moving.unknown -> moving.walking reason=activity app=background
+   09:40:45 sampling.apply trigger=transition strategy=B-tieredAccuracy state=moving.walking stream acc=10m filter=none type=3
+== B-tieredAccuracy dwell-start  (321 s)
+   points=187 first_after=0s longest_gap=1s
+   09:42:32 manager.error stream The operation couldn’t be completed. (kCLErrorDomain error 0.)
+   09:45:38 state moving.walking -> stationary reason=dwell app=background
+   09:45:38 sampling.apply trigger=transition strategy=B-tieredAccuracy state=stationary stream acc=100m filter=25m type=1
+== B-tieredAccuracy leave-start  (220 s)
+   points=116 first_after=1s longest_gap=18s
+   09:47:52 manager.error stream The operation couldn’t be completed. (kCLErrorDomain error 0.)
+   09:49:41 state stationary -> moving.walking reason=displacement app=background
+   09:49:41 sampling.apply trigger=transition strategy=B-tieredAccuracy state=moving.walking stream acc=10m filter=none type=3
+
+############ Round 4 · B kill during the stay: walk 150 m → stay → killed for 60 s → relaunch → walk 300 m away
+== B-tieredAccuracy walkout-start  (111 s)
+   points=110 first_after=1s longest_gap=1s
+   09:53:12 state moving.unknown -> moving.walking reason=activity app=background
+   09:53:12 sampling.apply trigger=transition strategy=B-tieredAccuracy state=moving.walking stream acc=10m filter=none type=3
+== B-tieredAccuracy dwell-start  (240 s)
+   points=186 first_after=0s longest_gap=1s
+   09:54:58 manager.error stream The operation couldn’t be completed. (kCLErrorDomain error 0.)
+   09:58:04 state moving.walking -> stationary reason=dwell app=background
+   09:58:04 sampling.apply trigger=transition strategy=B-tieredAccuracy state=stationary stream acc=100m filter=25m type=1
+== B-tieredAccuracy kill  (60 s)
+   points=1 first_after=1s longest_gap=-s
+   09:58:58 manager.error stream The operation couldn’t be completed. (kCLErrorDomain error 0.)
+== B-tieredAccuracy relaunch  (26 s)
+   points=2 first_after=1s longest_gap=1s
+   10:00:00 app.launch state=background armed=true paused=false strategy=B-tieredAccuracy auth=always lowPower=false
+   10:00:00 sampling.apply trigger=launch strategy=B-tieredAccuracy state=moving.unknown stream acc=10m filter=none type=3
+   10:00:00 manager.error stream The operation couldn’t be completed. (kCLErrorDomain error 0.)
+== B-tieredAccuracy leave-start  (221 s)
+   points=219 first_after=1s longest_gap=1s
+   10:00:29 state moving.unknown -> moving.walking reason=activity app=background
+   10:00:29 sampling.apply trigger=transition strategy=B-tieredAccuracy state=moving.walking stream acc=10m filter=none type=3
+2026-11-22T09:53:03.005+0900 app.launch state=background armed=true paused=false strategy=B-tieredAccuracy auth=always lowPower=false
+2026-11-22T09:53:03.007+0900 sampling.apply trigger=launch strategy=B-tieredAccuracy state=moving.unknown stream acc=10m filter=none type=3
+2026-11-22T09:53:12.106+0900 state moving.unknown -> moving.walking reason=activity app=background
+2026-11-22T09:53:12.106+0900 sampling.apply trigger=transition strategy=B-tieredAccuracy state=moving.walking stream acc=10m filter=none type=3
+2026-11-22T09:58:04.753+0900 state moving.walking -> stationary reason=dwell app=background
+2026-11-22T09:58:04.756+0900 sampling.apply trigger=transition strategy=B-tieredAccuracy state=stationary stream acc=100m filter=25m type=1
+2026-11-22T10:00:00.165+0900 app.launch state=background armed=true paused=false strategy=B-tieredAccuracy auth=always lowPower=false
+2026-11-22T10:00:00.169+0900 sampling.apply trigger=launch strategy=B-tieredAccuracy state=moving.unknown stream acc=10m filter=none type=3
+2026-11-22T10:00:29.188+0900 state moving.unknown -> moving.walking reason=activity app=background
+2026-11-22T10:00:29.188+0900 sampling.apply trigger=transition strategy=B-tieredAccuracy state=moving.walking stream acc=10m filter=none type=3
+2026-11-22T07:10:43.886+0900 pt src=slc acc=5m bucket=≤10m saved=true poor=false state=moving.unknown app=background replayed=true
+2026-11-22T09:53:02.037+0900 pt src=stream acc=5m bucket=≤10m saved=true poor=false state=moving.unknown app=inactive replayed=true
+Day stats after round 4: stationary 116 s (= transition to stay → relaunch, including the 60 s killed), max stay drift 0 m, longest moving gap 25 s, launches 2, transitions 3.

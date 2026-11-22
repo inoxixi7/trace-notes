@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>S3 sampling spike: records location all day to compare battery use of sampling strategies. Coordinates are not stored.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>S3 sampling spike: records location to compare sampling strategies. Coordinates are not stored.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>S3 sampling spike: motion activity decides when the phone is still or moving.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
+</dict>
+</plist>

@@ -4,7 +4,7 @@
 
 ## Current stage
 
-**Define is complete. Technical spikes in progress (S1 and S2 waiting for device tests).**
+**Define is complete. Technical spikes: S1, S2 and S3 simulator / Japan-side parts done; all three wait for device tests.**
 
 The workflow is Discover → Define → Design → Package → Execute & Verify. Discover (2026-11-21) produced decisions D1–D25. Define produced PRODUCT.md v0.1.
 
@@ -17,6 +17,7 @@ The workflow is Discover → Define → Design → Package → Execute & Verify.
 | 2026-11-21 | T0 · legacy inventory | `docs/LEGACY_INVENTORY.md`: 7 files proposed for migration, awaiting confirmation |
 | 2026-11-21 | S1 · Control Center pause (simulator part) | `spikes/S1-control-pause/` + `docs/spikes/S1-result.md`. Simulator: strategy A (keep sessions and updates, skip saving) pauses and resumes immediately from the background; strategy B (stop updates) fails because the app gets suspended. Conclusion **partially feasible**, waiting for device tests T1–T7 |
 | 2026-11-21 | S2 · GCJ-02 base map (Japan-side part) | `TraceNotes/MapDatum/` (GCJ-02 transform, mainland region 73.5 KB, per-point policy = default rule), new `TraceNotesTests` target (14 tests pass), Debug-only datum page (`TraceNotes/Debug/`), `Tools/geodata/` build scripts, `docs/spikes/S2-result.md`, `docs/THIRD_PARTY_NOTICES.md`. **Finding: seen from Japan, Apple Maps draws mainland China in WGS-84**, so the default rule alone would shift mainland tracks off the roads. Decided as **D26**: convert only inside the mainland **and** when the China base map is served (policy input, `false` until the signal is known). Waiting for the mainland device test (§6) |
+| 2026-11-21 | S3 · sampling strategy (simulator part) | Separate spike app `TraceNotesS3` (`spikes/S3-sampling/`): strategies A (system live updates), B (tiered accuracy, always on), C (geofence sleep), switchable in Debug; shared state machine (unit-tested), event log, day stats, MetricKit store. `docs/spikes/S3-result.md`: strategies, simulator results, device test plan, record sheet. Simulator: all three record City Run / Freeway at 1 Hz with ≤ 1 s gaps in the background; A and B complete moving → stay → leave; **C's geofence never fired in the simulator** (device check T-C0 first). Fixed two measurement bugs (cached replayed fixes, time lost after a kill). Preliminary pick: B baseline, A challenger. Waiting for device days |
 
 ## Spikes
 
@@ -24,7 +25,7 @@ The workflow is Discover → Define → Design → Package → Execute & Verify.
 |---|---|---|---|
 | S1 | Can a Control Widget pause / resume recording from Control Center while the app is in the background **and** after it has been killed, without destroying the background location session? | PRODUCT F2, D24 | Simulator done, **waiting for device tests** (`docs/spikes/S1-result.md` §4) |
 | S2 | How do we tell whether the current MapKit base map uses GCJ-02, so WGS-84 points can be converted only when needed? Needs on-device verification in mainland China | PRODUCT F7, D16, D17 | Japan-side done, rule decided (D26). **Waiting for mainland device test** M1–M7 to find the "China base map served" signal (`docs/spikes/S2-result.md` §6) |
-| S3 | What sampling strategy (accuracy / distance filter / activity type, CLVisit and significant-change wake-ups, stationary sleep) meets **< 3 % battery per day** while keeping moving gaps ≤ 2 min? | PRODUCT §6, D13, D25 | Not started |
+| S3 | What sampling strategy (accuracy / distance filter / activity type, CLVisit and significant-change wake-ups, stationary sleep) meets **< 3 % battery per day** while keeping moving gaps ≤ 2 min? | PRODUCT §6, D13, D25 | Simulator done, **waiting for device days** (`docs/spikes/S3-result.md` §6–7) |
 
 Note: PRODUCT.md and DECISIONS.md only name S1 and S2. S3 is defined in the task prompt list (CLAUDE_CODE_PROMPTS.md, "3% 耗电目标下的采样策略").
 
@@ -32,7 +33,7 @@ Note: PRODUCT.md and DECISIONS.md only name S1 and S2. S3 is defined in the task
 
 1. S1 device tests (you), then decide the final F2 approach
 2. S2: mainland device test on the next trip (finds the signal D26 needs)
-3. S3: sampling strategy for the 3 % target
+3. S3 device days (you): A, B, C ordinary days + pause, drift, walk, train, kill tests; can run alongside S1's device tests (disarm S1 on S3 days)
 4. Design: data model layers, storage choice, rendering (smooth curves + LOD) → ARCHITECTURE.md
 5. Package: split into vertical slices
 
@@ -45,6 +46,9 @@ Note: PRODUCT.md and DECISIONS.md only name S1 and S2. S3 is defined in the task
 - **Border jump (S2)**: per-point conversion makes a ~500 m jump where a track crosses into HK or Macau. Rendering has to decide how to draw it.
 - **OSM attribution (S2)**: `china-mainland.bin` contains ODbL data; "© OpenStreetMap contributors" must appear in the app before release (`docs/THIRD_PARTY_NOTICES.md`).
 - **Spike wiring (S2)**: Debug builds show a TabView (S1 + S2 Datum) in `TraceNotesApp`; remove it along with the S1 wiring.
-- **Battery vs. completeness (S3)**: all-day recording under 3 % is the hardest quantitative target.
+- **Battery vs. completeness (S3)**: all-day recording under 3 % is the hardest quantitative target. Not shown impossible; levers and the rules they touch are in S3-result §8.
+- **Strategy C wake-up (S3)**: no `CLMonitor` event at all in the simulator, foreground or background (S3-result §4.2). T-C0 on a device decides whether C is viable; restarting updates from that wake-up in the background (T-C1) is a second unknown.
+- **Replayed fixes (S3)**: significant-change monitoring delivers the last known fix with its old timestamp on every launch. Formal storage must not treat it as a new point in time order (dedupe / mark).
+- **Two spike apps on the device (S3)**: S1 (main app) and TN S3 both want Always location; disarm S1 on S3 test days.
 - **Legacy stabilizer at all-day scale**: it holds the whole session in memory and does several O(n) copies or scans per sample (see LEGACY_INVENTORY §4.2). Its session `finish()` has no direct equivalent under D1.
 - **Toolchain**: the machine has Xcode 27.0 (iOS 27 SDK) with an iOS 26.5 simulator runtime. The deployment target is 26.0.
