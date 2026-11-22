@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0A0000000000000000000073 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 0A0000000000000000000071 /* GRDB */; };
+		0A0000000000000000000074 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 0A0000000000000000000072 /* GRDB */; };
 		0A0000000000000000000019 /* TraceNotesWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000007 /* TraceNotesWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -54,6 +56,13 @@
 				MapDatum/GCJ02.swift,
 				MapDatum/MapDatumPolicy.swift,
 				MapDatum/china-mainland.bin,
+				Recording/EngineStateStore.swift,
+				Recording/MotionStateMachine.swift,
+				Recording/RecordingCore.swift,
+				Storage/AppDatabase.swift,
+				Storage/LocalDay.swift,
+				Storage/RawPoint.swift,
+				Storage/RecorderEvent.swift,
 			);
 			target = 0A0000000000000000000050 /* TraceNotesTests */;
 		};
@@ -126,6 +135,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0A0000000000000000000073 /* GRDB in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -140,6 +150,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0A0000000000000000000074 /* GRDB in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -224,6 +235,7 @@
 			);
 			name = TraceNotes;
 			packageProductDependencies = (
+				0A0000000000000000000071 /* GRDB */,
 			);
 			productName = TraceNotes;
 			productReference = 0A0000000000000000000006 /* TraceNotes.app */;
@@ -270,6 +282,7 @@
 			);
 			name = TraceNotesTests;
 			packageProductDependencies = (
+				0A0000000000000000000072 /* GRDB */,
 			);
 			productName = TraceNotesTests;
 			productReference = 0A0000000000000000000046 /* TraceNotesTests.xctest */;
@@ -330,6 +343,9 @@
 				Base,
 				ja,
 				"zh-Hans",
+			);
+			packageReferences = (
+				0A0000000000000000000070 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
 			);
 			mainGroup = 0A0000000000000000000002;
 			minimizedProjectReferenceProxies = 1;
@@ -819,6 +835,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		0A0000000000000000000070 /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/groue/GRDB.swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 7.12.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		0A0000000000000000000071 /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0A0000000000000000000070 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
+		};
+		0A0000000000000000000072 /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0A0000000000000000000070 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 0A0000000000000000000001 /* Project object */;
 }
