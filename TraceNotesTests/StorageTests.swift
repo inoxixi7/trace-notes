@@ -23,16 +23,17 @@ struct StorageTests {
       importBatchID: nil, flags: [.lowAccuracy])
   }
 
-  @Test func migratesEmptyDatabaseToV1() throws {
+  @Test func migratesEmptyDatabaseToLatest() throws {
     let (_, url) = try openDatabase()
     let queue = try DatabaseQueue(path: url.path(percentEncoded: false))
     try queue.read { db in
-      #expect(try AppDatabase.migrator.completedMigrations(db) == ["v1"])
+      #expect(try AppDatabase.migrator.completedMigrations(db) == ["v1", "v2"])
+      #expect(try db.tableExists("segments"))
       #expect(try db.tableExists("raw_points"))
       #expect(try db.tableExists("recorder_events"))
       #expect(try db.indexes(on: "raw_points").contains { $0.columns == ["timestamp"] })
       let triggers = try String.fetchAll(db, sql: "SELECT name FROM sqlite_master WHERE type = 'trigger' ORDER BY name")
-      #expect(triggers.count == 4)
+      #expect(triggers.count == 4)  // raw layer only; segments are derived and replaceable
     }
   }
 

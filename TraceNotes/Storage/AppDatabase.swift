@@ -70,6 +70,29 @@ nonisolated final class AppDatabase: Sendable {
         }
       }
     }
+
+    // VS2: the derived layer's segments (ARCHITECTURE §2.3). Recomputable, so not append-only.
+    migrator.registerMigration("v2") { db in
+      try db.create(table: Segment.databaseTableName) { table in
+        table.autoIncrementedPrimaryKey("id")
+        table.column("kind", .text).notNull()
+          .check { [Segment.Kind.stay.rawValue, Segment.Kind.move.rawValue, Segment.Kind.gap.rawValue].contains($0) }
+        table.column("start", .integer).notNull()  // UTC milliseconds
+        table.column("end", .integer).notNull()  // UTC milliseconds
+        table.column("timeZoneID", .text).notNull()
+        table.column("localDay", .text).notNull()  // yyyy-MM-dd in timeZoneID
+        table.column("isComplete", .boolean).notNull()
+        table.column("continuesNextDay", .boolean).notNull()
+        table.column("pointCount", .integer).notNull()
+        table.column("distance", .double).notNull()
+        table.column("centerLatitude", .integer)  // degrees × 10⁷, WGS-84
+        table.column("centerLongitude", .integer)  // degrees × 10⁷, WGS-84
+        table.column("radius", .double)
+        table.column("pipelineVersion", .integer).notNull()
+      }
+      try db.create(index: "segments_on_localDay", on: Segment.databaseTableName, columns: ["localDay", "start"])
+      try db.create(index: "segments_on_end", on: Segment.databaseTableName, columns: ["end"])
+    }
     return migrator
   }
 
@@ -108,6 +131,88 @@ nonisolated final class AppDatabase: Sendable {
       let event = try Int64.fetchOne(db, sql: "SELECT MAX(timestamp) FROM recorder_events")
       return [point, event].compactMap { $0 }.max().map(RawPoint.date(milliseconds:))
     }
+  }
+
+  // MARK: - Derived layer (segments)
+
+  /// What the segmenter needs to continue after the last completed segment, read in one
+  /// transaction so points and events are consistent.
+  struct SegmentationInput: Sendable {
+    /// The newest completed segment; processing continues from its end.
+    var lastComplete: Segment?
+    /// The newest point before `lastComplete.end`, for continuing a segment cut at midnight.
+    var pointBeforeCursor: RawPoint?
+    /// Points and events from `lastComplete.end` (inclusive) on, oldest first.
+    var points: [RawPoint]
+    var events: [RecorderEvent]
+  }
+
+  func segmentationInput() async throws -> SegmentationInput {
+    try await pool.read { db in
+      let lastComplete = try Segment
+        .filter(Segment.Columns.isComplete == true)
+        .order(Segment.Columns.end.desc, Segment.Columns.id.desc)
+        .fetchOne(db)
+      let cursor = lastComplete?.end ?? .distantPast
+      let cursorMilliseconds = RawPoint.milliseconds(cursor)
+      let before = try RawPoint
+        .filter(RawPoint.Columns.timestamp < cursorMilliseconds)
+        .order(RawPoint.Columns.timestamp.desc, RawPoint.Columns.id.desc)
+        .fetchOne(db)
+      let points = try Self.points(db, in: cursor..<Date.distantFuture)
+      let events = try RecorderEvent
+        .filter(RecorderEvent.Columns.timestamp >= cursorMilliseconds)
+        .order(RecorderEvent.Columns.timestamp, RecorderEvent.Columns.id)
+        .fetchAll(db)
+      return SegmentationInput(lastComplete: lastComplete, pointBeforeCursor: before, points: points, events: events)
+    }
+  }
+
+  /// Replaces the still-growing segment(s) with `segments`: the ones that completed since the last
+  /// run and the new open one.
+  func replaceOpenSegments(with segments: [Segment]) async throws {
+    try await pool.write { db in
+      try Segment.filter(Segment.Columns.isComplete == false).deleteAll(db)
+      for var segment in segments { try segment.insert(db) }
+    }
+  }
+
+  /// Drops every segment made by another pipeline version; they are rebuilt from the raw layer.
+  /// Returns how many were dropped.
+  @discardableResult
+  func deleteSegments(otherThan version: Int) async throws -> Int {
+    try await pool.write { db in
+      try Segment.filter(Segment.Columns.pipelineVersion != version).deleteAll(db)
+    }
+  }
+
+  /// The segments of one local day, oldest first, re-emitted after every change.
+  func observeSegments(on day: LocalDay) -> AsyncValueObservation<[Segment]> {
+    ValueObservation
+      .tracking { db in
+        try Segment
+          .filter(Segment.Columns.localDay == day.description)
+          .order(Segment.Columns.start, Segment.Columns.id)
+          .fetchAll(db)
+      }
+      .values(in: pool)
+  }
+
+  /// Emits once now and again whenever a point or an event has been appended.
+  func observeRawAppends() -> AsyncValueObservation<RawAppendMarker> {
+    ValueObservation
+      .tracking { db in
+        RawAppendMarker(
+          lastPointID: try Int64.fetchOne(db, sql: "SELECT MAX(id) FROM raw_points"),
+          lastEventID: try Int64.fetchOne(db, sql: "SELECT MAX(id) FROM recorder_events"))
+      }
+      .removeDuplicates()
+      .values(in: pool)
+  }
+
+  struct RawAppendMarker: Equatable, Sendable {
+    var lastPointID: Int64?
+    var lastEventID: Int64?
   }
 
   private static func points(_ db: Database, in range: Range<Date>) throws -> [RawPoint] {

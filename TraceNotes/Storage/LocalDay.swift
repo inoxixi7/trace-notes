@@ -31,6 +31,30 @@ nonisolated struct LocalDay: Hashable, Comparable, Sendable, CustomStringConvert
     self.init(date, in: TimeZone(identifier: timeZoneID) ?? .gmt)
   }
 
+  /// Parses the `yyyy-MM-dd` form of `description`.
+  init?(string: String) {
+    let parts = string.split(separator: "-").compactMap { Int($0) }
+    guard parts.count == 3 else { return nil }
+    self.init(year: parts[0], month: parts[1], day: parts[2])
+  }
+
+  /// The instant this date begins in `timeZone`.
+  func start(in timeZone: TimeZone) -> Date {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = timeZone
+    // A valid year/month/day always resolves (days that skip midnight start at the first
+    // existing instant).
+    return calendar.date(from: DateComponents(year: year, month: month, day: day)) ?? .distantPast
+  }
+
+  /// The following calendar date.
+  var next: LocalDay {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = .gmt
+    let start = calendar.date(from: DateComponents(year: year, month: month, day: day)) ?? .distantPast
+    return LocalDay(start.addingTimeInterval(36 * 3600), in: .gmt)
+  }
+
   /// UTC instants that can belong to this local date in *some* time zone: from the day's start
   /// at UTC+14 to its end at UTC−12. Used to pre-select points by timestamp before filtering by
   /// each point's own zone.

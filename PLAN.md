@@ -4,7 +4,7 @@
 
 ## Current stage
 
-**Execute & Verify: VS1 (record → store → today's track on the map) is done in the simulator and waits for device checks. Spikes S1–S3 still wait for device tests.**
+**Execute & Verify: VS1 (record → store → today on the map) and VS2 (stay detection + today's timeline) are done in the simulator and wait for device checks. Spikes S1–S3 still wait for device tests.**
 
 The workflow is Discover → Define → Design → Package → Execute & Verify. Discover (2026-11-21) produced decisions D1–D25. Define produced PRODUCT.md (now v0.2). Design produced ARCHITECTURE.md and D26–D30 (2026-11-22); the slice order is ARCHITECTURE §12.
 
@@ -20,6 +20,7 @@ The workflow is Discover → Define → Design → Package → Execute & Verify.
 | 2026-11-21 | S3 · sampling strategy (simulator part) | Separate spike app `TraceNotesS3` (`spikes/S3-sampling/`): strategies A (system live updates), B (tiered accuracy, always on), C (geofence sleep), switchable in Debug; shared state machine (unit-tested), event log, day stats, MetricKit store. `docs/spikes/S3-result.md`: strategies, simulator results, device test plan, record sheet. Simulator: all three record City Run / Freeway at 1 Hz with ≤ 1 s gaps in the background; A and B complete moving → stay → leave; **C's geofence never fired in the simulator** (device check T-C0 first). Fixed two measurement bugs (cached replayed fixes, time lost after a kill). Preliminary pick: B baseline, A challenger. Waiting for device days |
 | 2026-11-22 | Docs v0.2 | PRODUCT.md v0.2, DECISIONS.md D26–D30, new ARCHITECTURE.md. The old D26 (GCJ-02 rule) was renumbered **D31** because of a number clash |
 | 2026-11-22 | VS1 · record → store → today on the map (simulator part) | **Storage** (`TraceNotes/Storage/`): GRDB 7.12 (only dependency), WAL `DatabasePool` in Application Support with `completeUntilFirstUserAuthentication`, migration v1 = `raw_points` + `recorder_events`, ms INTEGER timestamps, coordinates as INTEGER degrees × 1e7, append-only triggers, reads only by time range and "observe a local day" (each point's own `timeZoneID`). **Recording** (`TraceNotes/Recording/`): one `RecordingEngine` on `CLLocationManager` with strategy B (S3 pick) behind a replaceable `SamplingStrategy`, `CLServiceSession(.always)` + `CLBackgroundActivitySession`, visits + significant change as wake-ups, motion activity; pure `RecordingCore` decides saving: D28 heartbeat (1 point / 5 min while stationary, a point outside the stay at once, skipped count reported per hour), replayed fixes saved with a flag but never deciding; engine state persisted in the App Group and restored after a kill; launch / backgroundRelaunch / terminatedDetected and the other prompt events written. **UI**: onboarding (explanation → Always → Motion → Today), Today = `MKMapView` polyline with live `ValueObservation`, status capsule for every F1 state with Settings links, empty and error states; ja / zh-Hans / en. **Spikes**: S1's two temporary hooks removed from the app entry and widget bundle; S1 + S2 pages only behind a Debug "Developer" button, absent from Release; the engine yields while the S1 recorder is armed. 47 tests pass |
+| 2026-11-22 | VS2 · stay detection + today's timeline (simulator part) | No written task prompt existed for VS2; the contract was drafted from ARCHITECTURE §5/§7/§12 and the three missing product rules were confirmed by the user (**D32**: stays ≥ 5 min, gap = > 5 min silence *and* moved beyond the stay radius, stays drawn as one marker). **Processing** (`TraceNotes/Processing/`): pure `Segmenter` (pipeline steps ① + ③): dwell 50 m / 5 min, stay radius 150 m (+ accuracy, as in the recorder), stay centre from its core only, silent-in-place = stay, visit arrival (after 5 min) and departure as time signals, cuts at local midnight in the segment's own zone with continuation (D30). `TrackProcessor` re-derives only the tail after the last completed segment on every raw append, so it holds no state across kills (§5.2) and the open segment doubles as the 30-min checkpoint; runs while the app is in the foreground and catches up on return. **Storage**: migration v2, derived `segments` table (ms / ×1e7 integer columns, `pipelineVersion`; other versions are dropped and rebuilt). **UI**: Today's timeline in a bottom sheet (three detents, map stays interactive, newest row in view, times in each segment's zone), map draws moves as lines and stays as one marker, tapping a row focuses the map; ja / zh-Hans / en. 62 tests pass |
 
 ## Spikes
 
@@ -33,8 +34,8 @@ Note: PRODUCT.md and DECISIONS.md only name S1 and S2. S3 is defined in the task
 
 ## Next
 
-1. VS1 device checks (you): see "VS1 device checks" below
-2. VS2 · stay detection + today's timeline list (ARCHITECTURE §12)
+1. VS1 + VS2 device checks (you): see the two lists below
+2. VS3 · smooth curves + LOD + pixel line widths + GCJ-02 display (ARCHITECTURE §12); needs its task prompt
 3. S1 device tests (you), then decide the final F2 approach. The main app no longer ships S1's Control Center widget: run T1–T7 from a build of commit `f75ba95` or earlier
 4. S2: mainland device test on the next trip (finds the signal D31 needs)
 5. S3 device days (you). TN S3 and the formal app must not record at the same time: on S3 days set Trace Notes' location access to Never
@@ -48,6 +49,16 @@ Note: PRODUCT.md and DECISIONS.md only name S1 and S2. S3 is defined in the task
 5. Turn Location Services off globally: Today shows the Location Services hint. Turn it back on.
 6. Low Power Mode on for a while: recording continues.
 7. Optional, for diagnosis: Xcode → Devices → download the app container and look at `recorder_events` (launch / backgroundRelaunch / terminatedDetected / heartbeatSkipped).
+
+## VS2 device checks
+
+1. A normal day with a few stops: each stop of 5 minutes or more is one "Stay" row and one marker; red lights and short shop visits stay inside "Moving".
+2. Phone lying indoors 30 min (PRODUCT §6 drift test): one stay, no scribble on the map.
+3. Overnight at home: yesterday's last stay ends at 24:00, today starts with a stay from 00:00.
+4. Leave home after the night: the stay ends near the departure time (visit or the first point outside 150 m), not hours later.
+5. Phone off for a while, then switched on somewhere else: a "No record" row covers the time.
+6. Tap rows: the map moves to the stay or trip above the panel.
+7. Open the app after hours in the background: the timeline catches up within about a second (F8 "≤ 1 s").
 
 ## Known risks
 
@@ -64,6 +75,10 @@ Note: PRODUCT.md and DECISIONS.md only name S1 and S2. S3 is defined in the task
 - **Launch classification (VS1)**: iOS 26 deprecates `launchOptions[.location]`. `launch` vs. `backgroundRelaunch` is decided by whether the connected scene is in the foreground at the first fix (a simulator probe showed UIKit connects a scene on both kinds of launch). If a device ever relaunches without connecting a scene, no launch event is written for that process; `terminatedDetected` is unaffected.
 - **Stationary + killed (VS1)**: while stationary the 25 m distance filter delivers no fixes, so after a kill the system only relaunches the app on movement (visit / significant change). In the simulator a killed stationary app stayed down; leaving the place relaunches it on a device (to check in device check 3).
 - **Write window on a kill (VS1)**: points are written one by one through a single async writer; a point received in the last moment before a kill can be lost.
-- **Today's polyline (VS1)**: a straight `MKPolyline` of all non-replayed points; a long jump appears as a straight line. Smoothing and LOD are later slices.
+- **Processing only in the foreground (VS2)**: segments are derived while the app is on screen. Nothing else reads them yet; a future widget or notification would need background processing.
+- **Stay start is approximate (VS2)**: the dwell anchor is checked against the newest point only, so a stay can begin up to ~30 s before the real arrival (simulator: 12:13:12 for an arrival at 12:13:43).
+- **Visits carry no coordinates (VS2)**: VS1 stores only visit times, so a visit-only stay takes its centre from nearby points.
+- **Indoor drift beyond 50 m (VS2)**: dwell needs usable points within 50 m for 5 minutes. Indoor drift wider than that is caught by the visit arrival or the silent-in-place rule; to check in device check 2.
+- **Today's polyline (VS1)**: a straight `MKPolyline` per move (VS2); a long jump inside a move appears as a straight line. Smoothing and LOD are later slices.
 - **Legacy stabilizer at all-day scale**: it holds the whole session in memory and does several O(n) copies or scans per sample (see LEGACY_INVENTORY §4.2). Its session `finish()` has no direct equivalent under D1.
 - **Toolchain**: the machine has Xcode 27.0 (iOS 27 SDK) with an iOS 26.5 simulator runtime. The deployment target is 26.0.

@@ -52,10 +52,13 @@
 		0A0000000000000000000045 /* Exceptions for "TraceNotes" folder in "TraceNotesTests" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Diagnostics/AppLog.swift,
 				MapDatum/ChinaMainlandRegion.swift,
 				MapDatum/GCJ02.swift,
 				MapDatum/MapDatumPolicy.swift,
 				MapDatum/china-mainland.bin,
+				Processing/Segmenter.swift,
+				Processing/TrackProcessor.swift,
 				Recording/EngineStateStore.swift,
 				Recording/MotionStateMachine.swift,
 				Recording/RecordingCore.swift,
@@ -63,6 +66,7 @@
 				Storage/LocalDay.swift,
 				Storage/RawPoint.swift,
 				Storage/RecorderEvent.swift,
+				Storage/Segment.swift,
 			);
 			target = 0A0000000000000000000050 /* TraceNotesTests */;
 		};

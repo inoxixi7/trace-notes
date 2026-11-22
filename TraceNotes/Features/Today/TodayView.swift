@@ -1,67 +1,110 @@
-import CoreLocation
 import GRDB
 import SwiftUI
 import UIKit
+import os
 
-/// The default screen (F8, VS1 scope): today's map with the raw track and the recording status.
-/// The timeline panel arrives with VS2.
+/// The default screen (F8): today's map, the recording status and the timeline panel.
 struct TodayView: View {
   let database: AppDatabase
   let engine: RecordingEngine
+  @Environment(\.scenePhase) private var scenePhase
   @State private var day = LocalDay(.now, in: .current)
   @State private var points: [RawPoint] = []
+  @State private var segments: [Segment] = []
   @State private var hasLoaded = false
   @State private var loadError: String?
+  @State private var processingError: String?
+  @State private var focus: MapFocus?
+  @State private var panelDetent = Self.collapsed
   #if DEBUG
   @State private var showsDeveloperMenu = false
   #endif
 
+  /// Panel heights: a peek showing the first rows, a third of the screen, and full height.
+  private static let collapsed = PresentationDetent.height(160)
+  private static let half = PresentationDetent.fraction(0.4)
+
   var body: some View {
-    TodayMapView(coordinates: trackCoordinates)
-      .ignoresSafeArea()
-      .overlay(alignment: .top) {
-        VStack(spacing: 8) {
-          StatusCapsule(status: RecordingStatus(engine: engine), motionDenied: RecordingStatus.motionDenied(engine))
-          if let loadError {
-            MessageCard(title: Text("Today’s track can’t be shown"), detail: Text(verbatim: loadError))
-          } else if hasLoaded, trackCoordinates.isEmpty {
-            MessageCard(title: Text("Nothing recorded today yet"), detail: Text("Your track appears here as you move."))
-          }
-        }
-        .padding(.horizontal)
-      }
-      #if DEBUG
-      .overlay(alignment: .bottomTrailing) {
-        Button {
-          showsDeveloperMenu = true
-        } label: {
-          Image(systemName: "hammer")
-            .padding(12)
-        }
-        .buttonStyle(.glass)
-        .accessibilityLabel(Text(verbatim: "Developer"))
-        .padding()
-      }
-      .sheet(isPresented: $showsDeveloperMenu) {
-        DeveloperMenu()
-      }
-      #endif
-      .task(id: day) {
-        await observePoints(on: day)
-      }
-      .task {
-        // Today changes at local midnight and when the time zone changes.
-        for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) {
-          day = LocalDay(.now, in: .current)
+    GeometryReader { geometry in
+      TodayMapView(segments: segments, points: points, focus: focus, bottomInset: panelHeight(in: geometry.size.height))
+        .ignoresSafeArea()
+    }
+    .ignoresSafeArea()
+    .overlay(alignment: .top) {
+      VStack(spacing: 8) {
+        StatusCapsule(status: RecordingStatus(engine: engine), motionDenied: RecordingStatus.motionDenied(engine))
+        if let loadError {
+          MessageCard(title: Text("Today’s track can’t be shown"), detail: Text(verbatim: loadError))
+        } else if hasLoaded, points.isEmpty {
+          MessageCard(title: Text("Nothing recorded today yet"), detail: Text("Your track appears here as you move."))
         }
       }
+      .padding(.horizontal)
+    }
+    .sheet(isPresented: .constant(true)) {
+      timelinePanel
+        .presentationDetents([Self.collapsed, Self.half, .large], selection: $panelDetent)
+        .presentationBackgroundInteraction(.enabled(upThrough: Self.half))
+        .presentationContentInteraction(.scrolls)
+        .presentationDragIndicator(.visible)
+        .interactiveDismissDisabled()
+    }
+    .task(id: day) {
+      await observe(day)
+    }
+    .task(id: ProcessingKey(day: day, isActive: scenePhase == .active)) {
+      // The derived layer is kept current only while the app is on screen; when it comes back,
+      // the processor catches up from the database (ARCHITECTURE §5.2). Restarting on a new day
+      // also cuts an ongoing stay at midnight.
+      guard scenePhase == .active else { return }
+      await runProcessor()
+    }
+    .task {
+      // Today changes at local midnight and when the time zone changes.
+      for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) {
+        day = LocalDay(.now, in: .current)
+      }
+    }
   }
 
-  /// Replayed fixes are stored but not part of the track: they repeat an old, cached position
-  /// (pipeline step ① skips them too, ARCHITECTURE §5.1).
-  private var trackCoordinates: [CLLocationCoordinate2D] {
-    points.filter { !$0.flags.contains(.replayed) }
-      .map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
+  private var timelinePanel: some View {
+    #if DEBUG
+    TimelinePanel(segments: segments, processingError: processingError, onSelect: select) {
+      showsDeveloperMenu = true
+    }
+    .sheet(isPresented: $showsDeveloperMenu) {
+      DeveloperMenu()
+    }
+    #else
+    TimelinePanel(segments: segments, processingError: processingError, onSelect: select)
+    #endif
+  }
+
+  private struct ProcessingKey: Equatable {
+    var day: LocalDay
+    var isActive: Bool
+  }
+
+  private func panelHeight(in height: CGFloat) -> CGFloat {
+    switch panelDetent {
+    case Self.collapsed: 160
+    case Self.half: height * 0.4
+    default: height * 0.4  // full height covers the map; focusing collapses it to half first
+    }
+  }
+
+  /// F8: picking a row focuses the map on it.
+  private func select(_ segment: Segment) {
+    guard let target = MapFocus.of(segment, in: points) else { return }
+    if panelDetent == .large { panelDetent = Self.half }
+    focus = target
+  }
+
+  private func observe(_ day: LocalDay) async {
+    await withTaskGroup { group in
+      group.addTask { await observePoints(on: day) }
+      group.addTask { await observeSegments(on: day) }
+    }
   }
 
   private func observePoints(on day: LocalDay) async {
@@ -75,6 +118,29 @@ struct TodayView: View {
       // The day changed or the view went away; the next task observes again.
     } catch {
       loadError = error.localizedDescription
+    }
+  }
+
+  private func observeSegments(on day: LocalDay) async {
+    do {
+      for try await daySegments in database.observeSegments(on: day) {
+        segments = daySegments
+      }
+    } catch is CancellationError {
+      // As above.
+    } catch {
+      processingError = error.localizedDescription
+    }
+  }
+
+  private func runProcessor() async {
+    do {
+      try await TrackProcessor(database: database).run()
+    } catch is CancellationError {
+      // Left the foreground or the day changed; the next run continues from the database.
+    } catch {
+      AppLog.processing.error("processing failed: \(error.localizedDescription, privacy: .public)")
+      processingError = error.localizedDescription
     }
   }
 }
