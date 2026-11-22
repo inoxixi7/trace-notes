@@ -3,7 +3,8 @@ import SwiftUI
 
 /// MKMapView wrapper (D27). Moves are drawn by `TrackCanvas` as smooth curves in screen-point
 /// widths from the render cache (VS3, D39); each stay is one dot at its centre, so drift while
-/// still never shows as a scribble (F3). Everything is drawn in display coordinates (D31).
+/// still never shows as a scribble (F3); each gap is a dashed link (F6, D42). Everything is drawn
+/// in display coordinates (D31).
 struct TodayMapView: UIViewRepresentable {
   let segments: [Segment]
   /// The day's points, oldest first; the open move takes its points from here by time.
@@ -108,7 +109,7 @@ struct TodayMapView: UIViewRepresentable {
           guard let latitude = segment.centerLatitude, let longitude = segment.centerLongitude else { continue }
           drawn[segment.start] = (Self.signature(of: segment), .stay(DisplayProjection.shared.mapPoint((latitude, longitude))))
         case .gap:
-          continue  // VS6 explains gaps (and draws the dashed subway link)
+          continue  // drawn as a link, below
         }
       }
       if !changes.isEmpty {
@@ -119,6 +120,7 @@ struct TodayMapView: UIViewRepresentable {
         guard case .stay(let point)? = drawn[segment.start]?.item else { return nil }
         return point
       })
+      canvas.setLinks(Self.links(of: segments, points: points))
       canvas.redraw(on: map)
       canvas.keepAnchorsNearCentre(on: map)
 
@@ -147,6 +149,24 @@ struct TodayMapView: UIViewRepresentable {
       }
       guard let first = rects.first else { return nil }
       return rects.dropFirst().reduce(first) { $0.union($1) }
+    }
+
+    /// A gap links the ends of the lines either side of it: a stay's centre (where moves end, D38)
+    /// or the nearest point. Gaps without a position on both sides are not drawn.
+    private static func links(of segments: [Segment], points: [RawPoint]) -> [TrackCanvas.Link] {
+      segments.indices.compactMap { index in
+        let gap = segments[index]
+        guard gap.kind == .gap else { return nil }
+        let before = index > 0 ? segments[index - 1].stayCenter : nil
+        let after = index + 1 < segments.count ? segments[index + 1].stayCenter : nil
+        guard
+          let from = before.map(DisplayProjection.shared.mapPoint)
+            ?? points.last(where: { $0.timestamp <= gap.start && !$0.flags.contains(.replayed) }).map({ MKMapPoint($0.displayCoordinate) }),
+          let to = after.map(DisplayProjection.shared.mapPoint)
+            ?? points.first(where: { $0.timestamp >= gap.end && !$0.flags.contains(.replayed) }).map({ MKMapPoint($0.displayCoordinate) })
+        else { return nil }
+        return TrackCanvas.Link(from: from, to: to, isTravelled: gap.gapTravelMode != nil)
+      }
     }
 
     private static func signature(of segment: Segment) -> Signature {

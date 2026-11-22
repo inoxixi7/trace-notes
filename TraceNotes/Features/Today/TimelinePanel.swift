@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Today's timeline (F8, VS2): stays, moves and gaps in time order, moves with their transport
-/// mode (F4, VS4) and stays with their place (F5, VS5). Gap causes (VS6) come later.
+/// mode (F4, VS4), stays with their place (F5, VS5) and gaps with their cause or the mode they
+/// were travelled by (F6, VS6).
 struct TimelinePanel: View {
   let segments: [Segment]
   let places: [Int64: Place]
@@ -37,7 +38,7 @@ struct TimelinePanel: View {
                 TimelineRow(segment: segment, place: segment.placeID.flatMap { places[$0] })
               }
               .buttonStyle(.plain)
-              if segment.kind == .move {
+              if segment.kind != .stay {
                 ModeMenu(segment: segment) { onChangeMode(segment, $0) }
               } else if segment.kind == .stay, let place = segment.placeID.flatMap({ places[$0] }) {
                 Button {
@@ -102,7 +103,7 @@ private struct TimelineRow: View {
     HStack(spacing: 12) {
       Image(systemName: symbol)
         .font(.title3)
-        .foregroundStyle(segment.kind == .gap ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tint))
+        .foregroundStyle(segment.kind == .gap && segment.gapTravelMode == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tint))
         .frame(width: 28)
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: 2) {
@@ -122,7 +123,7 @@ private struct TimelineRow: View {
     switch segment.kind {
     case .stay: "mappin.circle.fill"
     case .move: (segment.displayedTransportMode ?? .unknown).symbol
-    case .gap: "questionmark.circle"
+    case .gap: segment.gapTravelMode?.symbol ?? (segment.gapReason ?? .unknown).symbol
     }
   }
 
@@ -137,7 +138,7 @@ private struct TimelineRow: View {
         Text("Unknown place")
       }
     case .move: (segment.displayedTransportMode ?? .unknown).name
-    case .gap: Text("No record")
+    case .gap: segment.gapTravelMode?.name ?? (segment.gapReason ?? .unknown).name
     }
   }
 
@@ -166,8 +167,9 @@ private struct TimelineRow: View {
   }
 }
 
-/// F4: the user corrects a move's transport mode. The choice is kept by time range, so it survives
-/// recomputation (ARCHITECTURE §2.2).
+/// F4: the user corrects a move's transport mode, or says how a gap was travelled (a car in a
+/// tunnel, a subway the sensors missed; D42). The choice is kept by time range, so it survives
+/// recomputation (ARCHITECTURE §2.2). For a gap, `unknown` ("None") shows its cause again.
 private struct ModeMenu: View {
   let segment: Segment
   let onChange: (TransportMode) -> Void
@@ -176,7 +178,11 @@ private struct ModeMenu: View {
     Menu {
       Picker(selection: Binding(get: { segment.displayedTransportMode ?? .unknown }, set: { onChange($0) })) {
         ForEach(TransportMode.allCases, id: \.self) { mode in
-          Label { mode.name } icon: { Image(systemName: mode.symbol) }
+          if segment.kind == .gap, mode == .unknown {
+            Label { Text("None") } icon: { Image(systemName: "questionmark.circle") }
+          } else {
+            Label { mode.name } icon: { Image(systemName: mode.symbol) }
+          }
         }
       } label: {
         Text("Transport mode")
@@ -188,6 +194,28 @@ private struct ModeMenu: View {
         .contentShape(.rect)
     }
     .accessibilityLabel(Text("Change transport mode"))
+  }
+}
+
+extension GapReason {
+  var name: Text {
+    switch self {
+    case .permissionChanged: Text("Location access turned off")
+    case .locationOff: Text("Location Services off")
+    case .notRunning: Text("Phone off or app not running")
+    case .lowPower: Text("Low Power Mode on")
+    case .unknown: Text("No record")
+    }
+  }
+
+  var symbol: String {
+    switch self {
+    case .permissionChanged: "location.slash"
+    case .locationOff: "location.slash.fill"
+    case .notRunning: "iphone.slash"
+    case .lowPower: "battery.25percent"
+    case .unknown: "questionmark.circle"
+    }
   }
 }
 

@@ -58,8 +58,9 @@ nonisolated extension SegmentOverride {
   /// An override applies only where it covers a segment for at least this share of its range (§2.2).
   static let minimumOverlapShare = 0.5
 
-  /// Sets `userTransportMode` on the moves these transport-mode overrides match, in creation order
-  /// so the newest wins. Returns how many overrides matched nothing (overlap under half).
+  /// Sets `userTransportMode` on the moves and gaps these transport-mode overrides match (a gap's
+  /// mode is how it was travelled, D42), in creation order so the newest wins. Returns how many
+  /// overrides matched nothing (overlap under half).
   static func applyTransportModes(_ overrides: [SegmentOverride], to segments: inout [Segment]) -> Int {
     var unmatched = 0
     for override in overrides.sorted(by: { $0.createdAt < $1.createdAt }) where override.field == .transportMode {
@@ -69,7 +70,7 @@ nonisolated extension SegmentOverride {
       }
       let length = override.endTime.timeIntervalSince(override.startTime)
       let best = segments.indices
-        .filter { segments[$0].kind == .move }
+        .filter { segments[$0].kind != .stay }
         .map { index -> (index: Int, overlap: TimeInterval) in
           let overlap = min(segments[index].end, override.endTime).timeIntervalSince(max(segments[index].start, override.startTime))
           return (index, overlap)

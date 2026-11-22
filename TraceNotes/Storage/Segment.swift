@@ -36,6 +36,9 @@ nonisolated struct Segment: Equatable, Sendable {
 
   /// Stays only: the place it belongs to (F5), assigned when the segment is stored.
   var placeID: Int64? = nil
+  /// Gaps only: the cause from the recorder's events (F6). A gap ridden by subway also has
+  /// `transportMode == .subway`, and the user may give a gap any mode (D42).
+  var gapReason: GapReason? = nil
 
   /// The marker position of a stay; nil for moves and gaps.
   var stayCenter: (Double, Double)? {
@@ -45,6 +48,13 @@ nonisolated struct Segment: Equatable, Sendable {
 
   /// What the timeline shows: the user's choice wins (F4).
   var displayedTransportMode: TransportMode? { userTransportMode ?? transportMode }
+
+  /// Gaps only: the mode the gap was travelled by, automatic (subway) or the user's; nil when the
+  /// gap is shown by its reason (D42).
+  var gapTravelMode: TransportMode? {
+    guard kind == .gap, let mode = displayedTransportMode, mode != .unknown else { return nil }
+    return mode
+  }
 
   enum Kind: String, Sendable, DatabaseValueConvertible {
     case stay
@@ -75,6 +85,7 @@ nonisolated extension Segment: FetchableRecord, MutablePersistableRecord {
     static let modeConfidence = Column("modeConfidence")
     static let userTransportMode = Column("userTransportMode")
     static let placeID = Column("placeID")
+    static let gapReason = Column("gapReason")
   }
 
   init(row: Row) throws {
@@ -100,6 +111,7 @@ nonisolated extension Segment: FetchableRecord, MutablePersistableRecord {
     modeConfidence = row[Columns.modeConfidence]
     userTransportMode = row[Columns.userTransportMode]
     placeID = row[Columns.placeID]
+    gapReason = row[Columns.gapReason]
   }
 
   func encode(to container: inout PersistenceContainer) throws {
@@ -121,6 +133,7 @@ nonisolated extension Segment: FetchableRecord, MutablePersistableRecord {
     container[Columns.modeConfidence] = modeConfidence
     container[Columns.userTransportMode] = userTransportMode
     container[Columns.placeID] = placeID
+    container[Columns.gapReason] = gapReason
   }
 
   mutating func didInsert(_ inserted: InsertionSuccess) {

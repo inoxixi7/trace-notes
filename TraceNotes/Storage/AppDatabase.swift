@@ -146,6 +146,13 @@ nonisolated final class AppDatabase: Sendable {
         table.add(column: "placeID", .integer).references(Place.databaseTableName, onDelete: .setNull)
       }
     }
+    // VS6: gap reasons (F6, D42).
+    migrator.registerMigration("v6") { db in
+      try db.alter(table: Segment.databaseTableName) { table in
+        table.add(column: "gapReason", .text)
+          .check { GapReason.allCases.map(\.rawValue).contains($0) }
+      }
+    }
     return migrator
   }
 
@@ -200,6 +207,8 @@ nonisolated final class AppDatabase: Sendable {
     var events: [RecorderEvent]
     /// The newest Motion & Fitness reading before the cursor, still in force at its first point.
     var activityBeforeCursor: RecorderEvent?
+    /// The newest Low Power Mode change before the cursor, for gaps that start in it (F6).
+    var lowPowerBeforeCursor: RecorderEvent?
     /// User overrides that lie at least half after the cursor, so only new segments can match them.
     var overrides: [SegmentOverride]
   }
@@ -225,6 +234,10 @@ nonisolated final class AppDatabase: Sendable {
         .filter(RecorderEvent.Columns.kind == RecorderEvent.Kind.motionActivity && RecorderEvent.Columns.timestamp < cursorMilliseconds)
         .order(RecorderEvent.Columns.timestamp.desc, RecorderEvent.Columns.id.desc)
         .fetchOne(db)
+      let lowPower = try RecorderEvent
+        .filter([RecorderEvent.Kind.lowPowerModeOn, .lowPowerModeOff].contains(RecorderEvent.Columns.kind) && RecorderEvent.Columns.timestamp < cursorMilliseconds)
+        .order(RecorderEvent.Columns.timestamp.desc, RecorderEvent.Columns.id.desc)
+        .fetchOne(db)
       let overrides = try SegmentOverride
         .filter(SegmentOverride.Columns.endTime > cursorMilliseconds)
         .order(SegmentOverride.Columns.createdAt, SegmentOverride.Columns.id)
@@ -232,7 +245,7 @@ nonisolated final class AppDatabase: Sendable {
         .filter { $0.endTime.timeIntervalSince(cursor) >= $0.endTime.timeIntervalSince($0.startTime) * SegmentOverride.minimumOverlapShare }
       return SegmentationInput(
         lastComplete: lastComplete, pointBeforeCursor: before, points: points, events: events,
-        activityBeforeCursor: activity, overrides: overrides)
+        activityBeforeCursor: activity, lowPowerBeforeCursor: lowPower, overrides: overrides)
     }
   }
 

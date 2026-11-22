@@ -1,3 +1,4 @@
+import CoreLocation
 import Foundation
 import GRDB
 import os
@@ -58,6 +59,10 @@ nonisolated final class TrackProcessor: Sendable {
     var segments = segmented.flatMap { segment in
       segment.kind == .move ? TransportClassifier.split(segment, points: input.points, activities: activities) : [segment]
     }
+    // Pipeline step ⑥: why each gap has no points, and whether it was a subway ride (F6, D42).
+    for index in segments.indices where segments[index].kind == .gap {
+      explain(&segments[index], input: input, activities: activities)
+    }
     let unmatched = SegmentOverride.applyTransportModes(input.overrides, to: &segments)
     if unmatched > 0 {
       AppLog.processing.notice("\(unmatched) transport-mode overrides match no segment by half their range")
@@ -76,5 +81,20 @@ nonisolated final class TrackProcessor: Sendable {
       if segment.isComplete, track.count > 1 { renderLevels[index] = RenderCache.levels(of: track) }
     }
     try await database.replaceOpenSegments(with: segments, renderLevels: renderLevels)
+  }
+
+  private func explain(_ gap: inout Segment, input: AppDatabase.SegmentationInput, activities: [TransportClassifier.ActivityReading]) {
+    let usable = ([input.pointBeforeCursor].compactMap { $0 } + input.points).filter { !$0.flags.contains(.replayed) }
+    let entry = usable.last { $0.timestamp <= gap.start }
+    let exit = usable.first { $0.timestamp >= gap.end }
+    let lowPower = input.events.last { [.lowPowerModeOn, .lowPowerModeOff].contains($0.kind) && $0.timestamp < gap.start }
+      ?? input.lowPowerBeforeCursor
+    let explanation = GapExplainer.explain(
+      start: gap.start, end: gap.end, events: input.events, lowPowerBefore: lowPower,
+      activityBefore: activities.last { $0.timestamp <= gap.start },
+      entry: entry.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) },
+      exit: exit.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) })
+    gap.gapReason = explanation.reason
+    gap.transportMode = explanation.isSubway ? .subway : nil
   }
 }

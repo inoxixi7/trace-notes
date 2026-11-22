@@ -4,7 +4,7 @@
 
 ## Current stage
 
-**Execute & Verify: VS1 (record → store → today on the map), VS2 (stay detection + today's timeline), VS3 (track display layer), the trace stabilizer, VS4 (transport modes + per-segment editing) VS5 (places + renaming) and the device-feedback fixes (D38–D40) are done in the simulator and wait for device checks. Spikes S1–S3 still wait for device tests.**
+**Execute & Verify: VS1 (record → store → today on the map), VS2 (stay detection + today's timeline), VS3 (track display layer), the trace stabilizer, VS4 (transport modes + per-segment editing) VS5 (places + renaming), the device-feedback fixes (D38–D41) and VS6 (gap causes + subway) are done in the simulator and wait for device checks. Spikes S1–S3 still wait for device tests.**
 
 The workflow is Discover → Define → Design → Package → Execute & Verify. Discover (2026-11-21) produced decisions D1–D25. Define produced PRODUCT.md (now v0.3). Design produced ARCHITECTURE.md and D26–D30 (2026-11-22); the slice order is ARCHITECTURE §12.
 
@@ -31,6 +31,7 @@ The workflow is Discover → Define → Design → Package → Execute & Verify.
 | 2026-11-22 | Fix · third device feedback (D40) | **Track lag**: MapKit shows the base map one frame after the UIKit commit, so the D39 canvas led the map by about a frame (≈ 10 pt measured from a simulator screen recording during pans; the user saw the line float). The canvas now lives inside a zero-size MapKit annotation view that MapKit moves with the map; when the anchor drifts more than a quarter screen from the centre a new anchor is added and the old one removed once the new view exists (moving an anchor's coordinate blanked a frame, and MapKit culls off-screen anchors by coordinate). Measured again: ≈ 0.5 pt over 104 of 121 frames, the line never missing. **Pinch** (second device report: still floating while zooming): the camera the delegate reports is also a frame ahead, because MapKit places annotations for it only at its next display frame (probe: the anchor layer's position equals the previous callback's camera). A first fix queued the reported cameras and matched them to the anchor's position, but the device still drifted while a pinch was held (the simulator showed anchor positions that match no reported camera). Now a second anchor sits 0.3 × the shorter screen side below the first, and on every anchor move the scale and rotation come from the two positions MapKit gave them; the pair is replaced when either drifts 0.45 × the shorter side from the middle or they close to 0.15 ×. A third, independent probe annotation during held 60 Hz pinches (in and out) and fast pans: canvas within ≈ 1 pt of MapKit's placement, a constant rounding offset, never growing. The grey layer sits just below MapKit's annotation container (logged fallback to a coloured map if the hierarchy changes). **Light mode** is monochrome too. **Appearance button** (top right): Match System / Light / Dark for the whole app, stored in user defaults; ja / zh-Hans / en. Simulator: light and dark screenshots, the menu, pinch zoom and a timeline jump keep the line on its street. 99 + 16 (XCTest) tests pass, Release build 0 warnings |
 | 2026-11-22 | Fix · no blue location pill with Always (D41) | The blue status-bar pill came from the `CLBackgroundActivitySession` created on every launch (the SDK says it always shows the pill; it exists for When In Use). The session is now created only for When In Use and ended when Always is granted; with Always the location manager records in the background with the indicator off. Without the session a killed app was no longer relaunched (simulator: none within 3 min, the old build within 86 s), so the engine keeps a `CLLocationUpdate.liveUpdates()` subscription open, whose fixes are ignored: 5 of 6 simulator kills relaunched within 9 s (one miss, cause unknown). Device: no blue pill (user check). 99 + 16 (XCTest) tests pass, Release build 0 warnings |
 | 2026-11-22 | Docs · ARCHITECTURE v0.3, PRODUCT v0.3 | ARCHITECTURE.md brought in line with D33–D41 (track canvas, monochrome map, appearance switch, rounded corners, place names on the Place, single track colour, liveUpdates relaunch). PRODUCT F7 changed to one track colour for all modes, as the user confirmed (D36) |
+| 2026-11-22 | VS6 · gap causes + subway (simulator part) | No written task prompt; contract drafted from PRODUCT F6, ARCHITECTURE §2.3 / §5.1 ⑥, and the missing rules confirmed by the user (**D42**: one cause per gap in the order access > subway > not running > Low Power Mode > unknown; subway = riding per Motion & Fitness plus ≥ 1 km at 15–100 km/h straight-line; every gap a dashed link, travelled ones in the track colour; the user can give any gap a mode or "None"). **Processing**: pure `GapExplainer` (step ⑥) in `TrackProcessor`; the cause is stored in `segments.gapReason` (migration v6), a subway ride as the gap's `transportMode`; transport-mode overrides now also match gaps; pipeline v10. **UI**: gap rows show the cause or the mode, with the mode menu ("None" restores the cause); `TrackCanvas` draws dashed links. **Verified**: 107 tests pass (8 new `GapExplainer` cases, one processor test for a subway gap with a kill inside and the user's "None" surviving a rebuild); simulator: killed the app for 7 minutes and moved 8 km, the gap read "Phone off or app not running" with a faint dashed link, picking "Car" stored the override, kept `notRunning` underneath and turned the link the track colour. **Not verified**: automatic subway (no motion data in the simulator), the access and Low Power causes on a device |
 
 ## Spikes
 
@@ -45,7 +46,7 @@ Note: PRODUCT.md and DECISIONS.md only name S1 and S2. S3 is defined in the task
 ## Next
 
 1. VS1 + VS2 + VS3 + stabilizer + VS4 + VS5 device checks (you): see the lists below
-2. VS6 · gaps and subway marking (ARCHITECTURE §12); its contract is drafted from ARCHITECTURE like VS2–VS5
+2. VS6 device checks (you): see the list below
 3. S1 device tests (you), then decide the final F2 approach. The main app no longer ships S1's Control Center widget: run T1–T7 from a build of commit `f75ba95` or earlier
 4. S2: mainland device test on the next trip (finds the signal D31 needs)
 5. S3 device days (you). TN S3 and the formal app must not record at the same time: on S3 days set Trace Notes' location access to Never
@@ -105,6 +106,15 @@ Note: PRODUCT.md and DECISIONS.md only name S1 and S2. S3 is defined in the task
 4. Airplane mode, then stay somewhere 5+ minutes: the row shows “Unknown place”; with the network back, the name appears after the next retry (1–5 min while the app is open).
 5. Rename a place, then clear the name: the looked-up name comes back.
 
+## VS6 device checks
+
+1. Ride a subway for at least two stations with the app in the background: the gap row reads "Subway (estimated)" and the map shows a dashed line in the track colour between the stations (PRODUCT F6 asks for 8 of 10 rides on one known stretch).
+2. Drive through a long tunnel: the gap (if any) is not a subway unless the sensor said riding; pick "Car" in its menu and the dashed line takes the track colour.
+3. Force-quit the app, walk somewhere for 10 minutes, reopen it: the gap reads "Phone off or app not running", with a faint dashed line.
+4. Turn Location Services off for 10 minutes while walking: the gap reads "Location Services off".
+5. Switch Low Power Mode on, then leave the phone still in a pocket while walking: if a gap appears, it reads "Low Power Mode on".
+6. Pick "None" on a subway gap: the row shows the cause underneath again, and the line turns faint.
+
 ## Device-feedback fixes (D38–D41) checks
 
 1. Zoom in all the way on a walked corner: the line is one smooth curve, no straight pieces.
@@ -151,6 +161,9 @@ Note: PRODUCT.md and DECISIONS.md only name S1 and S2. S3 is defined in the task
 - **Name language (VS5)**: names come in the device language at lookup time (zh-Hans gives «全家便利商店…») and are not re-fetched when the language changes.
 - **Lookups only in the foreground (VS5)**: like segment processing; a place stays unnamed until the app is opened.
 - **Mainland China (VS5)**: lookups send WGS-84 centres; whether Apple's POI search in the mainland expects GCJ-02 is unknown (S2).
+- **Subway needs motion readings during the ride (VS6)**: readings are only recorded while the app runs. If iOS suspends or kills the app underground, only the readings around the gap count (riding before and after); walking out of the station afterwards defeats that, so the subway may show as "not running". Fetching the missed readings from Core Motion's history on relaunch would fix it (a recording change, not done).
+- **Subway rule is straight-line (VS6)**: 15–100 km/h between entry and exit. A ride with a long wait on the platform, or a winding line, can fall under 15 km/h; a very short hop under 1 km is never a subway. Not tuned on real rides.
+- **Simulator has no motion data (VS6)**: the subway rule is covered by unit tests only; the simulator check exercised the "not running" cause, the dashed links and the gap menu.
 - **Toolchain**: the machine has Xcode 27.0 (iOS 27 SDK) with an iOS 26.5 simulator runtime. The deployment target is 26.0.
 - **Monochrome grey layer (D38, D40)**: relies on the `saturationBlendMode` compositing filter, which Apple does not document for iOS, and on MapKit's private view order (annotation container inside the map content view); either may change in a later iOS. A changed hierarchy is logged and leaves the map in colour.
 - **Annotation-anchored track (D39, D40)**: in step with pans and held pinches in the simulator; held pinches on the device not yet confirmed. It relies on MapKit setting each anchor view's layer position when it applies a camera and moving both anchors in the same pass (observed, not documented). If MapKit rounds annotation positions to pixels on a device, the 0.3 × screen separation keeps the scale error under about 0.5 %. The whole day's path is re-transformed on each zoom frame (cost grows with the day's points at the shown level); pans need no redraw. Map pitch is off.

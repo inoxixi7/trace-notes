@@ -53,6 +53,35 @@ struct TrackProcessorTests {
     #expect(rows.last?.split(separator: " ")[2].hasPrefix("320-") == true)
   }
 
+  /// VS6 (D42): a gap ridden underground becomes a subway ride with its cause kept underneath;
+  /// the user's "None" survives a rebuild and shows the cause again.
+  @Test func aSubwayGapKeepsItsCauseAndTheUsersChoice() async throws {
+    // Walk 5 min, nothing for 20 min while riding 8 km, walk 5 min; the app relaunched meanwhile.
+    let points = helper.walk(from: 0, for: 300) + helper.walk(from: 1500, for: 300, startingAt: 8_420)
+    var riding = helper.event(600, .motionActivity)
+    riding.payload = "activity=automotive confidence=high"
+    let database = try openDatabase()
+    try await database.append(points: points, events: [riding, helper.event(1490, .backgroundRelaunch)])
+    try await TrackProcessor(database: database).process(now: points.last!.timestamp)
+
+    func gap() async throws -> Segment {
+      var iterator = database.observeSegments(on: LocalDay(year: 2026, month: 11, day: 22)).makeAsyncIterator()
+      let segments = try #require(try await iterator.next())
+      return try #require(segments.first { $0.kind == .gap })
+    }
+    let subway = try await gap()
+    #expect(subway.gapTravelMode == .subway)
+    #expect(subway.gapReason == .notRunning)
+
+    try await database.setTransportMode(.unknown, for: subway)
+    _ = try await database.deleteSegments(otherThan: -1)
+    try await TrackProcessor(database: database).process(now: points.last!.timestamp)
+    let corrected = try await gap()
+    #expect(corrected.userTransportMode == .unknown)
+    #expect(corrected.gapTravelMode == nil)
+    #expect(corrected.gapReason == .notRunning)
+  }
+
   @Test func incrementalRunsMatchOneBatchRun() async throws {
     let (points, events) = day()
     let now = points.last!.timestamp

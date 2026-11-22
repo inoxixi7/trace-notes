@@ -2,8 +2,9 @@ import MapKit
 import UIKit
 import os
 
-/// Draws the day over the map (D39, D40): the track as one smooth Bézier path and the stays as
-/// small dots, plus a grey layer that turns the base map monochrome in light and dark mode.
+/// Draws the day over the map (D39, D40): the track as one smooth Bézier path, the stays as small
+/// dots and the gaps as dashed links (F6, D42), plus a grey layer that turns the base map
+/// monochrome in light and dark mode.
 ///
 /// MapKit presents its map a frame after UIKit commits, so a view laid over the map led it by a
 /// frame while panning (device finding: the track "floated"). Annotation views are moved by MapKit
@@ -68,11 +69,16 @@ final class TrackCanvas: UIView {
   private let line = CAShapeLayer()
   private let dotRings = CAShapeLayer()
   private let dots = CAShapeLayer()
+  /// Gaps travelled by a known mode (a subway ride, or the user's choice) in the track's colour,
+  /// the others fainter (D42).
+  private let travelLinks = CAShapeLayer()
+  private let otherLinks = CAShapeLayer()
 
   /// The tracks, in map points relative to `origin` (see `TrackGeometry.path`).
   private var trackPath: CGPath?
   private var origin = MKMapPoint(x: 0, y: 0)
   private var stays: [MKMapPoint] = []
+  private var links: [Link] = []
   /// Map-point offsets to screen-point offsets (scale and rotation only) the canvas is drawn with.
   private var drawnScale: CGAffineTransform?
 
@@ -81,6 +87,10 @@ final class TrackCanvas: UIView {
   static let casingWidth: CGFloat = 8
   static let dotDiameter: CGFloat = 10
   static let dotRingWidth: CGFloat = 2.5
+  /// Dashed gap links, in screen points: a travelled gap as wide as the track, the others thinner.
+  static let travelLinkWidth: CGFloat = 4
+  static let otherLinkWidth: CGFloat = 2.5
+  static let linkDashPattern: [NSNumber] = [8, 7]
   /// Stay dots appear from about neighbourhood scale (≈ 2 km across a phone screen); further out
   /// the day reads as lines only (device feedback, D39).
   static let dotsMaximumMetresPerPoint = 5.0
@@ -107,7 +117,13 @@ final class TrackCanvas: UIView {
       layer.lineCap = .round
       layer.lineJoin = .round
     }
-    for layer in [casing, line, dotRings, dots] { self.layer.addSublayer(layer) }
+    for (layer, width) in [(travelLinks, Self.travelLinkWidth), (otherLinks, Self.otherLinkWidth)] {
+      layer.fillColor = nil
+      layer.lineWidth = width
+      layer.lineCap = .round
+      layer.lineDashPattern = Self.linkDashPattern
+    }
+    for layer in [otherLinks, travelLinks, casing, line, dotRings, dots] { self.layer.addSublayer(layer) }
   }
 
   @available(*, unavailable)
@@ -189,6 +205,18 @@ final class TrackCanvas: UIView {
 
   func setStays(_ stays: [MKMapPoint]) {
     self.stays = stays
+  }
+
+  /// A gap drawn as a straight dashed line between the positions on either side of it.
+  struct Link {
+    let from: MKMapPoint
+    let to: MKMapPoint
+    /// Travelled by a known mode: drawn like the track rather than faint.
+    let isTravelled: Bool
+  }
+
+  func setLinks(_ links: [Link]) {
+    self.links = links
   }
 
   /// The map has settled: draw from where the anchors ended up (a zoom exactly about an anchor may
@@ -275,6 +303,18 @@ final class TrackCanvas: UIView {
     dots.path = dotPath
     dotRings.fillColor = background
     dots.fillColor = accent
+
+    let travelPath = CGMutablePath()
+    let otherPath = CGMutablePath()
+    for link in links {
+      let path = link.isTravelled ? travelPath : otherPath
+      path.move(to: CGPoint(x: link.from.x, y: link.from.y).applying(toCanvas))
+      path.addLine(to: CGPoint(x: link.to.x, y: link.to.y).applying(toCanvas))
+    }
+    travelLinks.path = travelPath
+    otherLinks.path = otherPath
+    travelLinks.strokeColor = accent
+    otherLinks.strokeColor = UIColor.secondaryLabel.resolvedColor(with: traits).cgColor
   }
 
   /// Map points to the map view's points for the current camera, from `convert`; only used before

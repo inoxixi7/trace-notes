@@ -7,7 +7,7 @@ nonisolated enum TransportMode: String, CaseIterable, Sendable, DatabaseValueCon
   case cycling
   case car
   case train
-  /// Never chosen automatically yet: it needs the underground gaps of VS6 (D19). The user can pick it.
+  /// Chosen automatically only for a gap that looks like a subway ride (D19, D42); the user can pick it.
   case subway
   case airplane
   case unknown

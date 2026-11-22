@@ -15,11 +15,11 @@ import Foundation
 ///   of `gapInterval` or more: the recorder was still in its stationary heartbeat then (D28), so
 ///   the phone had not left, however far indoor drift put the fix (D39).
 /// - A **gap** is more than `gapInterval` without points *and* a position change beyond the stay
-///   radius. Its cause is not decided here (VS6).
+///   radius. Its cause is decided later, by `GapExplainer` (VS6).
 /// - Segments are cut at local midnight in their own time zone (D30).
 nonisolated struct Segmenter {
   /// Bump when the rules change: stored segments of another version are recomputed (§2.3).
-  static let pipelineVersion = 9
+  static let pipelineVersion = 10
 
   struct Parameters: Sendable {
     /// S3 dwell radius, shared with the recorder's state machine.
