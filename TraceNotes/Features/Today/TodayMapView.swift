@@ -120,7 +120,7 @@ struct TodayMapView: UIViewRepresentable {
         return point
       })
       canvas.redraw(on: map)
-      canvas.keepAnchorNearCentre(on: map)
+      canvas.keepAnchorsNearCentre(on: map)
 
       // Frame the day once, when everything drawable is drawn (segments can arrive before their
       // points); afterwards the user's own panning and zooming wins.
@@ -170,8 +170,7 @@ struct TodayMapView: UIViewRepresentable {
 
     func mapViewDidChangeVisibleRegion(_ mapView: MKMapView) {
       redrawTracks(on: mapView, force: false)
-      canvas.mapDidChangeCamera(mapView)
-      canvas.keepAnchorNearCentre(on: mapView)
+      canvas.keepAnchorsNearCentre(on: mapView)
     }
 
     func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
