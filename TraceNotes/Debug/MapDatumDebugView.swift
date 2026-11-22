@@ -72,10 +72,10 @@ struct MapDatumDebugView: View {
         Text(verbatim: loadError).foregroundStyle(.red)
       }
       Toggle(isOn: $model.assumeChinaBaseMap) {
-        Text(verbatim: "Assume China base map (D26 input)")
+        Text(verbatim: "Assume China base map (D31 input)")
       }
       .font(.footnote)
-      row("Decision (D26, per point)", model.decisionSummary)
+      row("Decision (D31, per point)", model.decisionSummary)
       row("Device location in mainland", model.deviceInMainlandSummary)
       row("Locale region", model.localeRegion)
       row("MapKit attribution", "read the logo at the map's bottom left")
@@ -85,7 +85,7 @@ struct MapDatumDebugView: View {
     } footer: {
       Text(
         verbatim:
-          "D26: convert inside the mainland only when the China base map is served. The other rows are evidence for the mainland device test."
+          "D31: convert inside the mainland only when the China base map is served. The other rows are evidence for the mainland device test."
       )
     }
   }
@@ -123,7 +123,7 @@ final class MapDatumDebugModel: NSObject, CLLocationManagerDelegate {
   private(set) var locationError: String?
   var mapSignals = MapDatumDebugMap.Signals()
 
-  /// D26 needs a "China base map served" signal that is not known yet; for the device test the
+  /// D31 needs a "China base map served" signal that is not known yet; for the device test the
   /// page lets you assume either case. On by default so the blue line shows the GCJ-02 candidate.
   var assumeChinaBaseMap = true {
     didSet { recompute() }

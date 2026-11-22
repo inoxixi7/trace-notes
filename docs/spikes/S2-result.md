@@ -4,9 +4,9 @@
 > Code: `TraceNotes/MapDatum/` (production modules), `TraceNotesTests/` (unit tests), `TraceNotes/Debug/` (Debug-only page), `Tools/geodata/` (data build scripts).
 > Environment: Xcode 27.0, iOS 26.5 Simulator (iPhone 17 Pro) on a Japanese network, `simctl location` for simulated positions.
 
-## 0. Headline: one observation conflicted with the default rule → decided as D26
+## 0. Headline: one observation conflicted with the default rule → decided as D31
 
-> **Decision (2026-11-21): option (b), recorded as D26.** Convert a point only when it is inside mainland China **and** the China base map is being served. Until the mainland device test finds a signal for "China base map served", `MapDatumPolicy` is given `chinaBaseMapServed = false`, so nothing is converted. The Debug page has a toggle to assume either case.
+> **Decision (2026-11-21): option (b), recorded as D31.** Convert a point only when it is inside mainland China **and** the China base map is being served. Until the mainland device test finds a signal for "China base map served", `MapDatumPolicy` is given `chinaBaseMapServed = false`, so nothing is converted. The Debug page has a toggle to assume either case.
 
 **Stop-and-report item (original report).** Seen from Japan, Apple Maps draws **mainland China in WGS-84**, not GCJ-02.
 
@@ -39,7 +39,7 @@ I did **not** change any rule. `MapDatumPolicy` implements the default rule exac
 - **(a)** keep the default rule as written, accepting a ~500 m offset outside China until the mainland test; or
 - **(b)** amend rule 2 to "convert a mainland point **only when the China base map is being served**". The signal for that is still to be found (§3, §6).
 
-You chose (b); see D26 in DECISIONS.md.
+You chose (b); see D31 in DECISIONS.md.
 
 ## 1. What was built
 
@@ -82,7 +82,7 @@ The land border is NE 1:10m everywhere except HK and Macau, which use OSM. Preci
 
 1. **Keep A (polygon, per point) as the only automatic geometric test.** It is correct for "where" and is required under any rule.
 2. **Add an environment condition before converting.** This needs your decision (§0). The candidate is "the China base map is served", derived from B and/or C. Which of the two (or neither) predicts the served map is exactly what the mainland test must find out (§6, M3).
-3. Implemented after D26: `MapDatumPolicy(mainland:chinaBaseMapServed:)`. The environment condition is one boolean, with no change to storage or to the per-point logic. Production passes `false` until the signal is known.
+3. Implemented after D31: `MapDatumPolicy(mainland:chinaBaseMapServed:)`. The environment condition is one boolean, with no change to storage or to the per-point logic. Production passes `false` until the signal is known.
 4. Optionally file a Feedback asking for a MapKit API that exposes the base map datum (H).
 
 How this relates to the default rule: steps 1, 3 and 4 are the default rule unchanged. Step 2 narrows it ("only when the China map is served") and needs your confirmation.
@@ -107,7 +107,7 @@ How this relates to the default rule: steps 1, 3 and 4 are the default rule unch
 | Transform within 1 m of reference: Beijing (2 sources), Shanghai, Shenzhen | Pass (`GCJ02Tests.matchesReference`, 4 cases) |
 | Tokyo, Seoul, New York, Taipei outside; Beijing, Shanghai inside | Pass |
 | Border pairs Lo Wu, Gongbei, Xiamen/Kinmen, Dandong/Sinuiju | Pass (14 cases in `ChinaMainlandRegionTests.classifies`) |
-| Per-point conversion on a crossing track; HK/Macau/Taipei/Tokyo unchanged; nothing converted when the China base map is not served (D26) | Pass (`MapDatumPolicyTests`) |
+| Per-point conversion on a crossing track; HK/Macau/Taipei/Tokyo unchanged; nothing converted when the China base map is not served (D31) | Pass (`MapDatumPolicyTests`) |
 | Loader: bad magic, unknown version, truncated, empty, polygon with hole, non-finite input | Pass |
 | Debug page in simulator: Beijing, Shanghai, HK, Tokyo | Pass (§4) |
 | Debug page absent from Release | Pass. Release binary contains no debug-page strings or symbols (`Map datum`, preset routes, signal labels: 0 hits). Only the empty object file name `MapDatumDebugView.o` appears in the debug-map path table |

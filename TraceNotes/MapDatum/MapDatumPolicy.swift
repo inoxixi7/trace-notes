@@ -9,7 +9,7 @@ nonisolated enum MapDatum: Sendable, Equatable {
 /// Decides, per point, which datum the MapKit base map uses there and returns the coordinate to
 /// draw. Display layer only: inputs are stored WGS-84 points, outputs are never written back (D16).
 ///
-/// Rule (D26): a point is drawn in GCJ-02 only when it is inside mainland China (excluding Hong
+/// Rule (D31): a point is drawn in GCJ-02 only when it is inside mainland China (excluding Hong
 /// Kong, Macau and Taiwan) **and** MapKit is serving the China base map; every other point is drawn
 /// as stored. The decision is per point, so a track that crosses the border is converted only on
 /// the mainland side. How to detect the China base map is still open (docs/spikes/S2-result.md §6);
