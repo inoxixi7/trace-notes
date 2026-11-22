@@ -124,6 +124,28 @@ nonisolated final class AppDatabase: Sendable {
       }
       try db.create(index: "segment_overrides_on_endTime", on: SegmentOverride.databaseTableName, columns: ["endTime"])
     }
+
+    // VS5: places (F5). They hold the user's names, so processing never deletes them (D37).
+    migrator.registerMigration("v5") { db in
+      try db.create(table: Place.databaseTableName) { table in
+        table.autoIncrementedPrimaryKey("id")
+        table.column("latitude", .integer).notNull()  // degrees × 10⁷, WGS-84
+        table.column("longitude", .integer).notNull()  // degrees × 10⁷, WGS-84
+        table.column("name", .text)
+        table.column("address", .text)
+        table.column("status", .text).notNull()
+          .check { [Place.Status.pending.rawValue, Place.Status.resolved.rawValue, Place.Status.failed.rawValue].contains($0) }
+        table.column("attempts", .integer).notNull().defaults(to: 0)
+        table.column("lastAttemptAt", .integer)  // UTC milliseconds
+        table.column("nextAttemptAt", .integer)  // UTC milliseconds
+        table.column("userName", .text)
+        table.column("createdAt", .integer).notNull()  // UTC milliseconds
+      }
+      try db.create(index: "places_on_latitude", on: Place.databaseTableName, columns: ["latitude"])
+      try db.alter(table: Segment.databaseTableName) { table in
+        table.add(column: "placeID", .integer).references(Place.databaseTableName, onDelete: .setNull)
+      }
+    }
     return migrator
   }
 
@@ -221,6 +243,9 @@ nonisolated final class AppDatabase: Sendable {
     try await pool.write { db in
       try Segment.filter(Segment.Columns.isComplete == false).deleteAll(db)
       for (index, var segment) in segments.enumerated() {
+        if segment.kind == .stay, let latitude = segment.centerLatitude, let longitude = segment.centerLongitude {
+          segment.placeID = try Self.placeID(db, latitude: latitude, longitude: longitude, createdAt: segment.start)
+        }
         try segment.insert(db)
         guard let levels = renderLevels[index], let segmentID = segment.id else { continue }
         for (level, coordinates) in levels.enumerated() {
@@ -228,6 +253,96 @@ nonisolated final class AppDatabase: Sendable {
         }
       }
     }
+  }
+
+  /// The place for a stay centred here (F5): the nearest one within `Place.matchRadius`, otherwise a
+  /// new one waiting for its name.
+  private static func placeID(_ db: Database, latitude: Double, longitude: Double, createdAt: Date) throws -> Int64? {
+    // A latitude band of the match radius narrows the candidates; `nearest` measures exactly.
+    let band = Place.matchRadius / 111_000 * RawPoint.coordinateScale
+    let scaled = Double(RawPoint.scaled(latitude))
+    let candidates = try Place
+      .filter(Place.Columns.latitude >= Int64(scaled - band) && Place.Columns.latitude <= Int64(scaled + band))
+      .fetchAll(db)
+    if let place = Place.nearest(to: latitude, longitude, in: candidates) { return place.id }
+    var place = Place(
+      id: nil, latitude: latitude, longitude: longitude, name: nil, address: nil, status: .pending, attempts: 0,
+      lastAttemptAt: nil, nextAttemptAt: nil, userName: nil, createdAt: createdAt)
+    try place.insert(db)
+    return place.id
+  }
+
+  /// Places whose name is due to be looked up at `now`: new ones, then failed ones whose retry time
+  /// has come, oldest first.
+  func placesToResolve(at now: Date, limit: Int) async throws -> [Place] {
+    try await pool.read { db in
+      try Place
+        .filter(
+          Place.Columns.status == Place.Status.pending
+            || (Place.Columns.status == Place.Status.failed && Place.Columns.nextAttemptAt <= RawPoint.milliseconds(now)))
+        .order(Place.Columns.createdAt, Place.Columns.id)
+        .limit(limit)
+        .fetchAll(db)
+    }
+  }
+
+  /// Stores a lookup result or failure. Leaves the user's name as it is in the database, in case
+  /// the user renamed the place while the lookup ran.
+  func saveLookup(of place: Place) async throws {
+    guard let id = place.id else { throw DatabaseError(message: "place has no ID") }
+    try await pool.write { db in
+      _ = try Place.filter(Place.Columns.id == id).updateAll(
+        db,
+        Place.Columns.name.set(to: place.name),
+        Place.Columns.address.set(to: place.address),
+        Place.Columns.status.set(to: place.status),
+        Place.Columns.attempts.set(to: place.attempts),
+        Place.Columns.lastAttemptAt.set(to: place.lastAttemptAt.map(RawPoint.milliseconds)),
+        Place.Columns.nextAttemptAt.set(to: place.nextAttemptAt.map(RawPoint.milliseconds)))
+    }
+  }
+
+  /// The user names a place (F5); nil or blank goes back to the looked-up name. Applies to every
+  /// visit of the place (D37).
+  func renamePlace(id: Int64, to name: String?) async throws {
+    let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let value = trimmed?.isEmpty == false ? trimmed : nil
+    try await pool.write { db in
+      _ = try Place.filter(Place.Columns.id == id).updateAll(db, Place.Columns.userName.set(to: value))
+    }
+  }
+
+  /// The places of one local day's stays, by ID, re-emitted after every change.
+  func observePlaces(on day: LocalDay) -> AsyncValueObservation<[Int64: Place]> {
+    ValueObservation
+      .tracking { db in
+        let places = try Place.fetchAll(
+          db,
+          sql: "SELECT * FROM places WHERE id IN (SELECT placeID FROM segments WHERE localDay = ? AND placeID IS NOT NULL)",
+          arguments: [day.description])
+        return Dictionary(uniqueKeysWithValues: places.compactMap { place in place.id.map { ($0, place) } })
+      }
+      .values(in: pool)
+  }
+
+  /// Emits now, when a place starts waiting for its name, and after every raw append (the clock
+  /// for retries: points arrive at least every heartbeat, D28).
+  func observePlaceWork() -> AsyncValueObservation<PlaceWorkMarker> {
+    ValueObservation
+      .tracking { db in
+        PlaceWorkMarker(
+          pendingPlaceIDs: try Int64.fetchAll(db, sql: "SELECT id FROM places WHERE status = 'pending' ORDER BY id"),
+          lastPointID: try Int64.fetchOne(db, sql: "SELECT MAX(id) FROM raw_points"),
+          lastEventID: try Int64.fetchOne(db, sql: "SELECT MAX(id) FROM recorder_events"))
+      }
+      .removeDuplicates()
+      .values(in: pool)
+  }
+
+  struct PlaceWorkMarker: Equatable, Sendable {
+    var pendingPlaceIDs: [Int64]
+    var lastPointID: Int64?
+    var lastEventID: Int64?
   }
 
   /// The user picked `mode` for a move (F4): saves the override by time range and shows it at once.

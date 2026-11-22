@@ -33,6 +33,9 @@ nonisolated struct Segment: Equatable, Sendable {
   /// Moves only: the user's choice, from the newest matching override (ARCHITECTURE §2.2).
   var userTransportMode: TransportMode? = nil
 
+  /// Stays only: the place it belongs to (F5), assigned when the segment is stored.
+  var placeID: Int64? = nil
+
   /// What the timeline shows: the user's choice wins (F4).
   var displayedTransportMode: TransportMode? { userTransportMode ?? transportMode }
 
@@ -64,6 +67,7 @@ nonisolated extension Segment: FetchableRecord, MutablePersistableRecord {
     static let transportMode = Column("transportMode")
     static let modeConfidence = Column("modeConfidence")
     static let userTransportMode = Column("userTransportMode")
+    static let placeID = Column("placeID")
   }
 
   init(row: Row) throws {
@@ -88,6 +92,7 @@ nonisolated extension Segment: FetchableRecord, MutablePersistableRecord {
     transportMode = row[Columns.transportMode]
     modeConfidence = row[Columns.modeConfidence]
     userTransportMode = row[Columns.userTransportMode]
+    placeID = row[Columns.placeID]
   }
 
   func encode(to container: inout PersistenceContainer) throws {
@@ -108,6 +113,7 @@ nonisolated extension Segment: FetchableRecord, MutablePersistableRecord {
     container[Columns.transportMode] = transportMode
     container[Columns.modeConfidence] = modeConfidence
     container[Columns.userTransportMode] = userTransportMode
+    container[Columns.placeID] = placeID
   }
 
   mutating func didInsert(_ inserted: InsertionSuccess) {

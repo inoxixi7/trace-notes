@@ -23,6 +23,28 @@
         }
       }
     },
+    "Cancel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "キャンセル"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消"
+          }
+        }
+      }
+    },
     "Can’t record in the background": {
       "localizations": {
         "en": {
@@ -173,6 +195,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "定位权限为“使用 App 期间”。要在关闭 App 后继续记录，请选择“始终”。"
+          }
+        }
+      }
+    },
+    "Looking up place…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Looking up place…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "場所を調べています…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在查找地点…"
           }
         }
       }
@@ -353,6 +397,28 @@
         }
       }
     },
+    "Place name": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Place name"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "場所の名前"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "地点名称"
+          }
+        }
+      }
+    },
     "Plane": {
       "localizations": {
         "en": {
@@ -397,6 +463,28 @@
         }
       }
     },
+    "Rename place": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename place"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "場所の名前を変更"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重命名地点"
+          }
+        }
+      }
+    },
     "Restart the app. If this keeps happening, restart your iPhone.\n%@": {
       "localizations": {
         "en": {
@@ -437,6 +525,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "跑步"
+          }
+        }
+      }
+    },
+    "Save": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存"
           }
         }
       }
@@ -525,6 +635,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "地铁（推测）"
+          }
+        }
+      }
+    },
+    "The new name is shown for every visit to this place.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The new name is shown for every visit to this place."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この場所へのすべての訪問に新しい名前が表示されます。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以后每次来到这个地点都会显示新名称。"
           }
         }
       }
@@ -679,6 +811,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "请在“设置”中打开定位服务以开始记录。"
+          }
+        }
+      }
+    },
+    "Unknown place": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unknown place"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不明な場所"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未知地点"
+          }
+        }
+      }
+    },
+    "Use automatic name": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use automatic name"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動の名前に戻す"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "恢复自动名称"
           }
         }
       }

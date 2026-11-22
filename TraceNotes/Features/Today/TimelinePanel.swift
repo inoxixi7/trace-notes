@@ -1,12 +1,16 @@
 import SwiftUI
 
 /// Today's timeline (F8, VS2): stays, moves and gaps in time order, moves with their transport
-/// mode (F4, VS4). Place names (VS5) and gap causes (VS6) come later.
+/// mode (F4, VS4) and stays with their place (F5, VS5). Gap causes (VS6) come later.
 struct TimelinePanel: View {
   let segments: [Segment]
+  let places: [Int64: Place]
   let processingError: String?
   let onSelect: (Segment) -> Void
   let onChangeMode: (Segment, TransportMode) -> Void
+  let onRenamePlace: (Int64, String?) -> Void
+  @State private var renaming: Place?
+  @State private var newName = ""
   #if DEBUG
   let onOpenDeveloperMenu: () -> Void
   #endif
@@ -30,11 +34,23 @@ struct TimelinePanel: View {
               Button {
                 onSelect(segment)
               } label: {
-                TimelineRow(segment: segment)
+                TimelineRow(segment: segment, place: segment.placeID.flatMap { places[$0] })
               }
               .buttonStyle(.plain)
               if segment.kind == .move {
                 ModeMenu(segment: segment) { onChangeMode(segment, $0) }
+              } else if segment.kind == .stay, let place = segment.placeID.flatMap({ places[$0] }) {
+                Button {
+                  newName = place.userName ?? place.displayName ?? ""
+                  renaming = place
+                } label: {
+                  Image(systemName: "pencil")
+                    .font(.footnote.weight(.semibold))
+                    .frame(width: 32, height: 44)
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel(Text("Rename place"))
               }
             }
           }
@@ -46,6 +62,16 @@ struct TimelinePanel: View {
         .onChange(of: segments.last?.start, initial: true) { _, newest in
           if let newest { proxy.scrollTo(newest, anchor: .bottom) }
         }
+      }
+      .alert(Text("Rename place"), isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+        TextField(text: $newName) { Text("Place name") }
+        Button { save(newName) } label: { Text("Save") }
+        if renaming?.userName != nil {
+          Button { save(nil) } label: { Text("Use automatic name") }
+        }
+        Button(role: .cancel) { renaming = nil } label: { Text("Cancel") }
+      } message: {
+        Text("The new name is shown for every visit to this place.")
       }
       .navigationTitle(Text("Timeline"))
       .navigationBarTitleDisplayMode(.inline)
@@ -61,8 +87,16 @@ struct TimelinePanel: View {
   }
 }
 
+extension TimelinePanel {
+  fileprivate func save(_ name: String?) {
+    if let id = renaming?.id { onRenamePlace(id, name) }
+    renaming = nil
+  }
+}
+
 private struct TimelineRow: View {
   let segment: Segment
+  let place: Place?
 
   var body: some View {
     HStack(spacing: 12) {
@@ -94,7 +128,14 @@ private struct TimelineRow: View {
 
   private var title: Text {
     switch segment.kind {
-    case .stay: Text("Stay")
+    case .stay:
+      if let name = place?.displayName {
+        Text(verbatim: name)
+      } else if place?.status == .pending {
+        Text("Looking up place…")
+      } else {
+        Text("Unknown place")
+      }
     case .move: (segment.displayedTransportMode ?? .unknown).name
     case .gap: Text("No record")
     }

@@ -12,6 +12,7 @@ struct TodayView: View {
   @State private var points: [RawPoint] = []
   @State private var segments: [Segment] = []
   @State private var renderCache: [Int64: [[RenderCache.Coordinate]]] = [:]
+  @State private var places: [Int64: Place] = [:]
   @State private var hasLoaded = false
   @State private var loadError: String?
   @State private var processingError: String?
@@ -71,14 +72,19 @@ struct TodayView: View {
 
   private var timelinePanel: some View {
     #if DEBUG
-    TimelinePanel(segments: segments, processingError: processingError, onSelect: select, onChangeMode: changeMode) {
+    TimelinePanel(
+      segments: segments, places: places, processingError: processingError, onSelect: select, onChangeMode: changeMode,
+      onRenamePlace: renamePlace
+    ) {
       showsDeveloperMenu = true
     }
     .sheet(isPresented: $showsDeveloperMenu) {
       DeveloperMenu()
     }
     #else
-    TimelinePanel(segments: segments, processingError: processingError, onSelect: select, onChangeMode: changeMode)
+    TimelinePanel(
+      segments: segments, places: places, processingError: processingError, onSelect: select, onChangeMode: changeMode,
+      onRenamePlace: renamePlace)
     #endif
   }
 
@@ -114,11 +120,24 @@ struct TodayView: View {
     }
   }
 
+  /// F5: the user's name for a place, shown on every visit (D37); blank restores the looked-up name.
+  private func renamePlace(_ placeID: Int64, to name: String?) {
+    Task {
+      do {
+        try await database.renamePlace(id: placeID, to: name)
+      } catch {
+        AppLog.processing.error("renaming a place failed: \(error.localizedDescription, privacy: .public)")
+        processingError = error.localizedDescription
+      }
+    }
+  }
+
   private func observe(_ day: LocalDay) async {
     await withTaskGroup { group in
       group.addTask { await observePoints(on: day) }
       group.addTask { await observeSegments(on: day) }
       group.addTask { await observeRenderCache(on: day) }
+      group.addTask { await observePlaces(on: day) }
     }
   }
 
@@ -160,7 +179,38 @@ struct TodayView: View {
     }
   }
 
+  private func observePlaces(on day: LocalDay) async {
+    do {
+      for try await dayPlaces in database.observePlaces(on: day) {
+        places = dayPlaces
+      }
+    } catch is CancellationError {
+      // As above.
+    } catch {
+      processingError = error.localizedDescription
+    }
+  }
+
   private func runProcessor() async {
+    await withTaskGroup { group in
+      group.addTask { await runTrackProcessor() }
+      group.addTask { await runPlaceResolver() }
+    }
+  }
+
+  /// Pipeline step ⑤: place names are looked up while the app is on screen, like the segments.
+  private func runPlaceResolver() async {
+    do {
+      try await PlaceResolver(database: database).run()
+    } catch is CancellationError {
+      // As for the processor.
+    } catch {
+      AppLog.processing.error("place lookup stopped: \(error.localizedDescription, privacy: .public)")
+      processingError = error.localizedDescription
+    }
+  }
+
+  private func runTrackProcessor() async {
     do {
       try await TrackProcessor(database: database).run()
     } catch is CancellationError {
