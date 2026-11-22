@@ -67,6 +67,7 @@
 				Processing/Stabilizer/TraceStabilizer.swift,
 				Processing/Stabilizer/TraceStabilizerConfiguration.swift,
 				Processing/TrackProcessor.swift,
+				Processing/TransportClassifier.swift,
 				Recording/EngineStateStore.swift,
 				Recording/MotionStateMachine.swift,
 				Recording/RecordingCore.swift,
@@ -76,6 +77,8 @@
 				Storage/RecorderEvent.swift,
 				Storage/RenderCacheEntry.swift,
 				Storage/Segment.swift,
+				Storage/SegmentOverride.swift,
+				Storage/TransportMode.swift,
 			);
 			target = 0A0000000000000000000050 /* TraceNotesTests */;
 		};

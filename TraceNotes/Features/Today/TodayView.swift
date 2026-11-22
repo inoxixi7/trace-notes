@@ -71,14 +71,14 @@ struct TodayView: View {
 
   private var timelinePanel: some View {
     #if DEBUG
-    TimelinePanel(segments: segments, processingError: processingError, onSelect: select) {
+    TimelinePanel(segments: segments, processingError: processingError, onSelect: select, onChangeMode: changeMode) {
       showsDeveloperMenu = true
     }
     .sheet(isPresented: $showsDeveloperMenu) {
       DeveloperMenu()
     }
     #else
-    TimelinePanel(segments: segments, processingError: processingError, onSelect: select)
+    TimelinePanel(segments: segments, processingError: processingError, onSelect: select, onChangeMode: changeMode)
     #endif
   }
 
@@ -100,6 +100,18 @@ struct TodayView: View {
     guard let target = MapFocus.of(segment, in: points) else { return }
     if panelDetent == .large { panelDetent = Self.half }
     focus = target
+  }
+
+  /// F4: the user's correction, saved in the modification layer.
+  private func changeMode(_ segment: Segment, to mode: TransportMode) {
+    Task {
+      do {
+        try await database.setTransportMode(mode, for: segment)
+      } catch {
+        AppLog.processing.error("saving transport mode failed: \(error.localizedDescription, privacy: .public)")
+        processingError = error.localizedDescription
+      }
+    }
   }
 
   private func observe(_ day: LocalDay) async {

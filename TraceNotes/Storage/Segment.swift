@@ -27,6 +27,14 @@ nonisolated struct Segment: Equatable, Sendable {
   var radius: Double?
   /// The pipeline that produced the row; rows of another version are recomputed (§2.3).
   var pipelineVersion: Int
+  /// Moves only: the automatic mode (pipeline step ④) and the share of the move that voted for it.
+  var transportMode: TransportMode? = nil
+  var modeConfidence: Double? = nil
+  /// Moves only: the user's choice, from the newest matching override (ARCHITECTURE §2.2).
+  var userTransportMode: TransportMode? = nil
+
+  /// What the timeline shows: the user's choice wins (F4).
+  var displayedTransportMode: TransportMode? { userTransportMode ?? transportMode }
 
   enum Kind: String, Sendable, DatabaseValueConvertible {
     case stay
@@ -53,6 +61,9 @@ nonisolated extension Segment: FetchableRecord, MutablePersistableRecord {
     static let centerLongitude = Column("centerLongitude")
     static let radius = Column("radius")
     static let pipelineVersion = Column("pipelineVersion")
+    static let transportMode = Column("transportMode")
+    static let modeConfidence = Column("modeConfidence")
+    static let userTransportMode = Column("userTransportMode")
   }
 
   init(row: Row) throws {
@@ -74,6 +85,9 @@ nonisolated extension Segment: FetchableRecord, MutablePersistableRecord {
     centerLongitude = (row[Columns.centerLongitude] as Int64?).map { Double($0) / RawPoint.coordinateScale }
     radius = row[Columns.radius]
     pipelineVersion = row[Columns.pipelineVersion]
+    transportMode = row[Columns.transportMode]
+    modeConfidence = row[Columns.modeConfidence]
+    userTransportMode = row[Columns.userTransportMode]
   }
 
   func encode(to container: inout PersistenceContainer) throws {
@@ -91,6 +105,9 @@ nonisolated extension Segment: FetchableRecord, MutablePersistableRecord {
     container[Columns.centerLongitude] = centerLongitude.map(RawPoint.scaled)
     container[Columns.radius] = radius
     container[Columns.pipelineVersion] = pipelineVersion
+    container[Columns.transportMode] = transportMode
+    container[Columns.modeConfidence] = modeConfidence
+    container[Columns.userTransportMode] = userTransportMode
   }
 
   mutating func didInsert(_ inserted: InsertionSuccess) {

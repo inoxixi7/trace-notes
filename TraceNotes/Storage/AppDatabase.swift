@@ -104,6 +104,26 @@ nonisolated final class AppDatabase: Sendable {
         table.primaryKey(["segmentID", "level"])
       }
     }
+
+    // VS4: transport modes on moves, and the user modification layer (ARCHITECTURE §2.2), which is
+    // user data: processing never deletes it.
+    migrator.registerMigration("v4") { db in
+      try db.alter(table: Segment.databaseTableName) { table in
+        table.add(column: "transportMode", .text)
+        table.add(column: "modeConfidence", .double)
+        table.add(column: "userTransportMode", .text)
+      }
+      try db.create(table: SegmentOverride.databaseTableName) { table in
+        table.autoIncrementedPrimaryKey("id")
+        table.column("startTime", .integer).notNull()  // UTC milliseconds
+        table.column("endTime", .integer).notNull()  // UTC milliseconds
+        table.column("field", .text).notNull()
+          .check { [SegmentOverride.Field.transportMode.rawValue, SegmentOverride.Field.placeName.rawValue].contains($0) }
+        table.column("value", .text).notNull()
+        table.column("createdAt", .integer).notNull()  // UTC milliseconds
+      }
+      try db.create(index: "segment_overrides_on_endTime", on: SegmentOverride.databaseTableName, columns: ["endTime"])
+    }
     return migrator
   }
 
@@ -156,6 +176,10 @@ nonisolated final class AppDatabase: Sendable {
     /// Points and events from `lastComplete.end` (inclusive) on, oldest first.
     var points: [RawPoint]
     var events: [RecorderEvent]
+    /// The newest Motion & Fitness reading before the cursor, still in force at its first point.
+    var activityBeforeCursor: RecorderEvent?
+    /// User overrides that lie at least half after the cursor, so only new segments can match them.
+    var overrides: [SegmentOverride]
   }
 
   func segmentationInput() async throws -> SegmentationInput {
@@ -175,7 +199,18 @@ nonisolated final class AppDatabase: Sendable {
         .filter(RecorderEvent.Columns.timestamp >= cursorMilliseconds)
         .order(RecorderEvent.Columns.timestamp, RecorderEvent.Columns.id)
         .fetchAll(db)
-      return SegmentationInput(lastComplete: lastComplete, pointBeforeCursor: before, points: points, events: events)
+      let activity = try RecorderEvent
+        .filter(RecorderEvent.Columns.kind == RecorderEvent.Kind.motionActivity && RecorderEvent.Columns.timestamp < cursorMilliseconds)
+        .order(RecorderEvent.Columns.timestamp.desc, RecorderEvent.Columns.id.desc)
+        .fetchOne(db)
+      let overrides = try SegmentOverride
+        .filter(SegmentOverride.Columns.endTime > cursorMilliseconds)
+        .order(SegmentOverride.Columns.createdAt, SegmentOverride.Columns.id)
+        .fetchAll(db)
+        .filter { $0.endTime.timeIntervalSince(cursor) >= $0.endTime.timeIntervalSince($0.startTime) * SegmentOverride.minimumOverlapShare }
+      return SegmentationInput(
+        lastComplete: lastComplete, pointBeforeCursor: before, points: points, events: events,
+        activityBeforeCursor: activity, overrides: overrides)
     }
   }
 
@@ -192,6 +227,19 @@ nonisolated final class AppDatabase: Sendable {
           try RenderCacheEntry(segmentID: segmentID, level: level, coordinates: coordinates).insert(db)
         }
       }
+    }
+  }
+
+  /// The user picked `mode` for a move (F4): saves the override by time range and shows it at once.
+  /// Processing re-applies it whenever the segments are rebuilt.
+  func setTransportMode(_ mode: TransportMode, for segment: Segment, at now: Date = .now) async throws {
+    guard let segmentID = segment.id else { throw DatabaseError(message: "segment has no ID") }
+    try await pool.write { db in
+      var override = SegmentOverride(
+        id: nil, startTime: segment.start, endTime: segment.end, field: .transportMode, value: mode.rawValue, createdAt: now)
+      try override.insert(db)
+      try Segment.filter(Segment.Columns.id == segmentID)
+        .updateAll(db, Segment.Columns.userTransportMode.set(to: mode))
     }
   }
 

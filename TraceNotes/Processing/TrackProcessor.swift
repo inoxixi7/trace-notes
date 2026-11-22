@@ -51,7 +51,17 @@ nonisolated final class TrackProcessor: Sendable {
       segmenter.add(event)
       nextEvent = events.next()
     }
-    let segments = segmenter.finish(at: now)
+    let segmented = segmenter.finish(at: now)
+    // Pipeline step ④: transport modes, then the user's corrections (ARCHITECTURE §2.2).
+    let activities = ([input.activityBeforeCursor].compactMap { $0 } + input.events)
+      .compactMap(TransportClassifier.ActivityReading.init)
+    var segments = segmented.flatMap { segment in
+      segment.kind == .move ? TransportClassifier.split(segment, points: input.points, activities: activities) : [segment]
+    }
+    let unmatched = SegmentOverride.applyTransportModes(input.overrides, to: &segments)
+    if unmatched > 0 {
+      AppLog.processing.notice("\(unmatched) transport-mode overrides match no segment by half their range")
+    }
     // Pipeline step ⑦: completed moves get their simplified levels now; the open one is
     // simplified in memory by the map while it grows (ARCHITECTURE §5.1).
     var renderLevels: [Int: [[RenderCache.Coordinate]]] = [:]

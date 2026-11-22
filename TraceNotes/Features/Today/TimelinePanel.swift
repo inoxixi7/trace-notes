@@ -1,11 +1,12 @@
 import SwiftUI
 
-/// Today's timeline (F8, VS2): stays, moves and gaps in time order. Place names (VS5),
-/// transport modes (VS4) and gap causes (VS6) come later.
+/// Today's timeline (F8, VS2): stays, moves and gaps in time order, moves with their transport
+/// mode (F4, VS4). Place names (VS5) and gap causes (VS6) come later.
 struct TimelinePanel: View {
   let segments: [Segment]
   let processingError: String?
   let onSelect: (Segment) -> Void
+  let onChangeMode: (Segment, TransportMode) -> Void
   #if DEBUG
   let onOpenDeveloperMenu: () -> Void
   #endif
@@ -25,12 +26,17 @@ struct TimelinePanel: View {
               .foregroundStyle(.secondary)
           }
           ForEach(segments, id: \.start) { segment in
-            Button {
-              onSelect(segment)
-            } label: {
-              TimelineRow(segment: segment)
+            HStack(spacing: 8) {
+              Button {
+                onSelect(segment)
+              } label: {
+                TimelineRow(segment: segment)
+              }
+              .buttonStyle(.plain)
+              if segment.kind == .move {
+                ModeMenu(segment: segment) { onChangeMode(segment, $0) }
+              }
             }
-            .buttonStyle(.plain)
           }
         }
         .listStyle(.plain)
@@ -81,7 +87,7 @@ private struct TimelineRow: View {
   private var symbol: String {
     switch segment.kind {
     case .stay: "mappin.circle.fill"
-    case .move: "point.bottomleft.forward.to.point.topright.scurvepath"
+    case .move: (segment.displayedTransportMode ?? .unknown).symbol
     case .gap: "questionmark.circle"
     }
   }
@@ -89,7 +95,7 @@ private struct TimelineRow: View {
   private var title: Text {
     switch segment.kind {
     case .stay: Text("Stay")
-    case .move: Text("Moving")
+    case .move: (segment.displayedTransportMode ?? .unknown).name
     case .gap: Text("No record")
     }
   }
@@ -116,5 +122,58 @@ private struct TimelineRow: View {
     let distance = Measurement(value: segment.distance, unit: UnitLength.meters)
       .formatted(.measurement(width: .abbreviated, usage: .road))
     return Text(verbatim: "\(distance) · \(duration)")
+  }
+}
+
+/// F4: the user corrects a move's transport mode. The choice is kept by time range, so it survives
+/// recomputation (ARCHITECTURE §2.2).
+private struct ModeMenu: View {
+  let segment: Segment
+  let onChange: (TransportMode) -> Void
+
+  var body: some View {
+    Menu {
+      Picker(selection: Binding(get: { segment.displayedTransportMode ?? .unknown }, set: { onChange($0) })) {
+        ForEach(TransportMode.allCases, id: \.self) { mode in
+          Label { mode.name } icon: { Image(systemName: mode.symbol) }
+        }
+      } label: {
+        Text("Transport mode")
+      }
+    } label: {
+      Image(systemName: "chevron.up.chevron.down")
+        .font(.footnote.weight(.semibold))
+        .frame(width: 32, height: 44)
+        .contentShape(.rect)
+    }
+    .accessibilityLabel(Text("Change transport mode"))
+  }
+}
+
+extension TransportMode {
+  var name: Text {
+    switch self {
+    case .walking: Text("Walking")
+    case .running: Text("Running")
+    case .cycling: Text("Cycling")
+    case .car: Text("Car")
+    case .train: Text("Train")
+    case .subway: Text("Subway (estimated)")
+    case .airplane: Text("Plane")
+    case .unknown: Text("Moving")
+    }
+  }
+
+  var symbol: String {
+    switch self {
+    case .walking: "figure.walk"
+    case .running: "figure.run"
+    case .cycling: "bicycle"
+    case .car: "car.fill"
+    case .train: "tram.fill"
+    case .subway: "tram.fill.tunnel"
+    case .airplane: "airplane"
+    case .unknown: "point.bottomleft.forward.to.point.topright.scurvepath"
+    }
   }
 }
