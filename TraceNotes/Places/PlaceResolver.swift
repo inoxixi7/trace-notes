@@ -10,6 +10,8 @@ nonisolated final class PlaceResolver: Sendable {
   struct Lookup: Equatable, Sendable {
     var name: String?
     var address: String?
+    /// ISO 3166 region code; nil where the lookup names none.
+    var countryCode: String? = nil
   }
 
   typealias LookupFunction = @Sendable (_ latitude: Double, _ longitude: Double) async throws -> Lookup
@@ -39,9 +41,13 @@ nonisolated final class PlaceResolver: Sendable {
     for var place in try await database.placesToResolve(at: now, limit: Self.batchSize) {
       do {
         let found = try await lookup(place.latitude, place.longitude)
-        place.name = found.name
-        place.address = found.address
-        place.status = .resolved
+        if !place.needsCountryOnly {
+          place.name = found.name
+          place.address = found.address
+          place.status = .resolved
+        }
+        place.countryCode = found.countryCode
+        place.countryStatus = .resolved
         place.attempts += 1
         place.lastAttemptAt = now
         place.nextAttemptAt = nil
@@ -85,8 +91,9 @@ nonisolated final class PlaceResolver: Sendable {
     guard let reverse = MKReverseGeocodingRequest(location: location) else {
       throw LookupError.invalidCoordinate
     }
-    let address = try await reverse.mapItems.first?.address
-    lookup.address = address?.shortAddress ?? address?.fullAddress
+    let item = try await reverse.mapItems.first
+    lookup.address = item?.address?.shortAddress ?? item?.address?.fullAddress
+    lookup.countryCode = item?.addressRepresentations?.region?.identifier
     if lookup.name == nil, lookup.address == nil { throw LookupError.nothingFound }
     return lookup
   }

@@ -69,6 +69,104 @@ struct GeoTests {
     #expect(openEast.allSatisfy { abs($0) < 10 })
   }
 
+  // MARK: - Ways into and out of stays (D52)
+
+  func stay(from start: TimeInterval, to end: TimeInterval, north: Double = 0, east: Double = 0) -> Segment {
+    let helper = SegmenterTests()
+    let center = helper.point(0, north: north, east: east)
+    return Segment(
+      id: nil, kind: .stay, start: helper.base.addingTimeInterval(start), end: helper.base.addingTimeInterval(end),
+      timeZoneID: "Asia/Tokyo", localDay: LocalDay(year: 2026, month: 11, day: 22), isComplete: true,
+      continuesNextDay: false, pointCount: 0, distance: 0, centerLatitude: center.latitude,
+      centerLongitude: center.longitude, radius: nil, pipelineVersion: Segmenter.pipelineVersion)
+  }
+
+  func move(from start: TimeInterval, to end: TimeInterval) -> Segment {
+    var move = stay(from: start, to: end)
+    move.kind = .move
+    move.centerLatitude = nil
+    move.centerLongitude = nil
+    return move
+  }
+
+  /// Fixes every 5 s at walking pace along straight legs through `corners` (north, east), from
+  /// `start` on, as the recorder saves a walk. Each corner after the first is reached in turn.
+  func walk(from start: TimeInterval, through corners: [(Double, Double)]) -> [RawPoint] {
+    let helper = SegmenterTests()
+    var result = [helper.point(start, north: corners[0].0, east: corners[0].1)]
+    var time = start
+    for (from, to) in zip(corners, corners.dropFirst()) {
+      let length = hypot(to.0 - from.0, to.1 - from.1)
+      let legs = Int((length / (Self.walkingSpeed * Self.fixInterval)).rounded(.up))
+      for step in 1...legs {
+        let share = Double(step) / Double(legs)
+        time += length / Self.walkingSpeed / Double(legs)
+        result.append(helper.point(time, north: from.0 + (to.0 - from.0) * share, east: from.1 + (to.1 - from.1) * share))
+      }
+    }
+    return result
+  }
+
+  static let walkingSpeed = 1.4
+  static let fixInterval = 5.0
+
+  func metres(_ track: [RenderCache.Coordinate]) -> [(north: Double, east: Double)] {
+    let helper = SegmenterTests()
+    return track.map { (($0.latitude - 35) / helper.metre, ($0.longitude - 139) / helper.metre * cos(35 * .pi / 180)) }
+  }
+
+  /// Out of the door, 30 m east to the street, then south: the first 46 m are still inside the
+  /// stay, yet the line follows them instead of cutting from the marker straight to the corner.
+  @Test func trackFollowsTheWayOutOfAStay() throws {
+    let helper = SegmenterTests()
+    let still = stride(from: 0.0, to: 540, by: 10).map { helper.point($0, north: $0.truncatingRemainder(dividingBy: 20) == 0 ? 2 : -2) }
+    let route = walk(from: 540, through: [(0, 0), (0, 30), (-130, 30)])
+    // The stay ends at the last fix within the dwell radius.
+    let departure = try #require(route.last { hypot($0.latitude - 35, ($0.longitude - 139) * cos(35 * .pi / 180)) / helper.metre <= 50 })
+    let start = departure.timestamp.timeIntervalSince(helper.base)
+    let track = RenderCache.track(
+      of: move(from: start, to: route.last!.timestamp.timeIntervalSince(helper.base)), previous: stay(from: 0, to: start),
+      next: nil, points: still + route, maximumAccuracy: Segmenter.Parameters().maximumDecisionAccuracy)
+    let drawn = metres(track)
+    #expect(drawn.first.map { abs($0.north) < 1 && abs($0.east) < 1 } == true)
+    // Every drawn point is on the street east or the street south: no diagonal.
+    #expect(drawn.allSatisfy { abs($0.north) < 4 || abs($0.east - 30) < 4 })
+    #expect(RenderCache.length(of: track) > 140)
+  }
+
+  /// Walking into a place from the side: the line follows the recorded path to the marker.
+  @Test func trackFollowsTheWayIntoAStay() throws {
+    let helper = SegmenterTests()
+    let route = walk(from: 0, through: [(130, -30), (40, -30), (40, 0), (0, 0)])
+    let arrival = try #require(route.first { hypot($0.latitude - 35, ($0.longitude - 139) * cos(35 * .pi / 180)) / helper.metre <= 50 })
+    let end = arrival.timestamp.timeIntervalSince(helper.base)
+    let settled = route.last!.timestamp.timeIntervalSince(helper.base)
+    let still = stride(from: settled + 10, to: settled + 600, by: 10).map {
+      helper.point($0, east: $0.truncatingRemainder(dividingBy: 20) == 0 ? 2 : -2)
+    }
+    let track = RenderCache.track(
+      of: move(from: 0, to: end), previous: nil, next: stay(from: end, to: settled + 600), points: route + still,
+      maximumAccuracy: Segmenter.Parameters().maximumDecisionAccuracy)
+    let drawn = metres(track)
+    #expect(drawn.last.map { abs($0.north) < 1 && abs($0.east) < 1 } == true)
+    #expect(drawn.allSatisfy { abs($0.east + 30) < 4 || abs($0.north - 40) < 4 || abs($0.east) < 4 })
+    #expect(RenderCache.length(of: track) > 140)
+  }
+
+  /// Moving about inside a place before leaving is part of the stay: at most the points after the
+  /// last one near the centre are drawn, never the whole stay.
+  @Test func wayOutNeverTakesOverTheStay() {
+    let helper = SegmenterTests()
+    // Ten minutes pacing 0–15 m from the centre with 3 m fixes, then a last point 25 m out at the
+    // door. Half the points are within 10 m, so only the last pacing step and the door are drawn.
+    let pacing = stride(from: 0.0, to: 600, by: 10).map { helper.point($0, east: $0.truncatingRemainder(dividingBy: 40) / 2, accuracy: 3) }
+    let door = helper.point(605, north: 25, accuracy: 3)
+    let way = RenderCache.way(
+      of: stay(from: 0, to: 610), leaving: true, points: pacing + [door, helper.point(610, north: 30, accuracy: 3)],
+      maximumAccuracy: Segmenter.Parameters().maximumDecisionAccuracy)
+    #expect(way.map(\.timestamp) == [helper.base.addingTimeInterval(590), door.timestamp])
+  }
+
   // MARK: - Catmull-Rom
 
   @Test func curvePassesThroughEveryPoint() {

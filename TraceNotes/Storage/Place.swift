@@ -20,6 +20,12 @@ nonisolated struct Place: Equatable, Sendable {
   /// The user's name; wins over the looked-up one (F5).
   var userName: String?
   var createdAt: Date
+  /// ISO 3166 region code from reverse geocoding (D50); nil until looked up, or where the lookup
+  /// names no region (open sea).
+  var countryCode: String? = nil
+  /// Places named before the statistics slice still need their region: they are looked up again
+  /// for it alone, without touching their names (D50).
+  var countryStatus: Status = .pending
 
   enum Status: String, Sendable, DatabaseValueConvertible {
     case pending
@@ -49,6 +55,8 @@ nonisolated extension Place: FetchableRecord, MutablePersistableRecord {
     static let nextAttemptAt = Column("nextAttemptAt")
     static let userName = Column("userName")
     static let createdAt = Column("createdAt")
+    static let countryCode = Column("countryCode")
+    static let countryStatus = Column("countryStatus")
   }
 
   init(row: Row) throws {
@@ -63,6 +71,8 @@ nonisolated extension Place: FetchableRecord, MutablePersistableRecord {
     nextAttemptAt = (row[Columns.nextAttemptAt] as Int64?).map(RawPoint.date(milliseconds:))
     userName = row[Columns.userName]
     createdAt = RawPoint.date(milliseconds: row[Columns.createdAt])
+    countryCode = row[Columns.countryCode]
+    countryStatus = row[Columns.countryStatus]
   }
 
   func encode(to container: inout PersistenceContainer) throws {
@@ -77,6 +87,8 @@ nonisolated extension Place: FetchableRecord, MutablePersistableRecord {
     container[Columns.nextAttemptAt] = nextAttemptAt.map(RawPoint.milliseconds)
     container[Columns.userName] = userName
     container[Columns.createdAt] = RawPoint.milliseconds(createdAt)
+    container[Columns.countryCode] = countryCode
+    container[Columns.countryStatus] = countryStatus
   }
 
   mutating func didInsert(_ inserted: InsertionSuccess) {
@@ -93,12 +105,22 @@ nonisolated extension Place {
       .min { $0.1 < $1.1 }?.0
   }
 
-  /// The state after a failed lookup at `now`.
+  /// The state after a failed lookup at `now`. A place that already has its name keeps it and
+  /// waits only for its region.
   mutating func recordFailure(at now: Date) {
-    status = .failed
+    if status == .resolved {
+      countryStatus = .failed
+    } else {
+      status = .failed
+    }
     attempts += 1
     lastAttemptAt = now
     nextAttemptAt = now.addingTimeInterval(Self.retryDelays[min(attempts, Self.retryDelays.count) - 1])
+  }
+
+  /// Whether the next lookup is only for the region (the name is already resolved).
+  var needsCountryOnly: Bool {
+    status == .resolved && countryStatus != .resolved
   }
 }
 

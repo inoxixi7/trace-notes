@@ -10,7 +10,9 @@ import Foundation
 ///   where the recorder was silent for longer than `gapInterval` without moving (the stationary
 ///   heartbeat and distance filter save few points, D28).
 /// - A stay is left at the first usable point beyond `stayRadius` (plus its accuracy, as in the
-///   recorder) or at a visit departure. It ends at its last usable point within `dwellRadius` of
+///   recorder), at a visit departure, or at the first usable point beyond `dwellRadius` (plus its
+///   accuracy) once Motion & Fitness has reported moving for `walkingExit` since the stay began
+///   (D51: a short walk near home is a move; drift is not, since the phone lies still). It ends at its last usable point within `dwellRadius` of
 ///   its centre, so the way out belongs to the move and is drawn (D38), but never before a silence
 ///   of `gapInterval` or more: the recorder was still in its stationary heartbeat then (D28), so
 ///   the phone had not left, however far indoor drift put the fix (D39).
@@ -19,7 +21,7 @@ import Foundation
 /// - Segments are cut at local midnight in their own time zone (D30).
 nonisolated struct Segmenter {
   /// Bump when the rules change: stored segments of another version are recomputed (§2.3).
-  static let pipelineVersion = 10
+  static let pipelineVersion = 12
 
   struct Parameters: Sendable {
     /// S3 dwell radius, shared with the recorder's state machine.
@@ -32,6 +34,8 @@ nonisolated struct Segmenter {
     var gapInterval: TimeInterval = 300
     /// Worse points are kept in their segment but decide nothing (S3).
     var maximumDecisionAccuracy: Double = 100
+    /// Motion & Fitness reporting moving this long lets a stay end at the dwell radius (D51).
+    var walkingExit: TimeInterval = 120
   }
 
   /// Where processing resumes.
@@ -77,6 +81,9 @@ nonisolated struct Segmenter {
   private var pendingVisitArrival: Date?
   private var lastPoint: RawPoint?
   private var output: [Segment] = []
+  /// Since when Motion & Fitness has reported moving (walking, running, cycling or riding); a
+  /// stationary reading ends it, an unknown one does not (D51).
+  private var movingSince: Date?
 
   init(seed: Seed, parameters: Parameters = Parameters()) {
     self.parameters = parameters
@@ -141,7 +148,7 @@ nonisolated struct Segmenter {
     }
     switch current.kind {
     case .stay:
-      if usable, let center = current.center, isOutside(point, of: center) {
+      if usable, let center = current.center, isOutside(point, of: center) || walkedOut(point, from: current, center: center) {
         let end = departure(from: current, center: center, leavingAt: point)
         close(at: end)
         let wayOut = current.points.filter { $0.timestamp >= end }
@@ -156,8 +163,17 @@ nonisolated struct Segmenter {
     }
   }
 
-  /// Only visit events matter here; the other kinds explain gaps later (VS6).
+  /// Visit events and Motion & Fitness readings matter here; the other kinds explain gaps later
+  /// (VS6).
   mutating func add(_ event: RecorderEvent) {
+    if let reading = TransportClassifier.ActivityReading(event) {
+      switch reading.activity {
+      case .walking, .running, .cycling, .automotive: movingSince = movingSince ?? reading.timestamp
+      case .stationary: movingSince = nil
+      case .unknown: break
+      }
+      return
+    }
     guard let current = open else {
       // Processing resumed at a cursor (often the arrival itself, when the stay it started was
       // open in the previous run): the move begins with the next point.
@@ -330,6 +346,15 @@ nonisolated struct Segmenter {
 
   private func isOutside(_ point: RawPoint, of center: Coordinate) -> Bool {
     Self.distance(coordinate(of: point), center) > parameters.stayRadius + point.horizontalAccuracy
+  }
+
+  /// The user has been moving since after the stay began, long enough, and this point is beyond
+  /// the dwell radius (D51).
+  private func walkedOut(_ point: RawPoint, from stay: Open, center: Coordinate) -> Bool {
+    guard let movingSince, movingSince >= stay.start,
+      point.timestamp.timeIntervalSince(movingSince) >= parameters.walkingExit
+    else { return false }
+    return Self.distance(coordinate(of: point), center) > parameters.dwellRadius + point.horizontalAccuracy
   }
 
   private func nextUsableIndex(in points: [RawPoint], after index: Int) -> Int? {

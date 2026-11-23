@@ -181,9 +181,8 @@ struct TodayMapView: UIViewRepresentable {
             if movePoints.isEmpty, segment.pointCount > 0 { continue }
             levels = RenderCache.levels(
               of: RenderCache.track(
-                ofMove: movePoints, isComplete: segment.isComplete,
-                from: index > 0 ? segments[index - 1].stayCenter : nil,
-                to: index + 1 < segments.count ? segments[index + 1].stayCenter : nil))
+                of: segment, previous: index > 0 ? segments[index - 1] : nil,
+                next: index + 1 < segments.count ? segments[index + 1] : nil, points: points))
           }
           guard let track = TrackGeometry<Date>.Track(levels: levels.map { $0.map(DisplayProjection.shared.mapPoint) }) else { continue }
           changes[segment.start] = .some(track)

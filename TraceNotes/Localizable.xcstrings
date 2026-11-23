@@ -23,6 +23,74 @@
         }
       }
     },
+    "%lld countries and regions": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld country or region"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld countries and regions"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld の国と地域"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个国家和地区"
+          }
+        }
+      }
+    },
+    "%lld places are still being looked up": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld place is still being looked up"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld places are still being looked up"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld か所の国をまだ調べています"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还有 %lld 个地点在查询所属国家"
+          }
+        }
+      }
+    },
     "%lld stays": {
       "localizations": {
         "en": {
@@ -53,6 +121,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld 个停留"
+          }
+        }
+      }
+    },
+    "All Time": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "すべて"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全部"
           }
         }
       }
@@ -189,6 +273,22 @@
         }
       }
     },
+    "Countries and Regions": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "国と地域"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "国家和地区"
+          }
+        }
+      }
+    },
     "Cycling": {
       "localizations": {
         "en": {
@@ -233,6 +333,38 @@
         }
       }
     },
+    "Distance": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "距離"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "里程"
+          }
+        }
+      }
+    },
+    "Earlier year": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "前の年"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "前一年"
+          }
+        }
+      }
+    },
     "Every day’s tracks appear here once you’ve moved.": {
       "localizations": {
         "en": {
@@ -273,6 +405,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "隐藏记录状态"
+          }
+        }
+      }
+    },
+    "Hour": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "時"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "小时"
+          }
+        }
+      }
+    },
+    "Later year": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "次の年"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "后一年"
           }
         }
       }
@@ -471,6 +635,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "跟随系统"
+          }
+        }
+      }
+    },
+    "Minutes": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分钟"
+          }
+        }
+      }
+    },
+    "Minutes on the move by hour of the day": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "時間帯別の移動時間（分）"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "各小时的移动时间（分钟）"
           }
         }
       }
@@ -893,6 +1089,22 @@
         }
       }
     },
+    "Recorded Days": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録した日数"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "记录天数"
+          }
+        }
+      }
+    },
     "Recording": {
       "localizations": {
         "en": {
@@ -1047,6 +1259,22 @@
         }
       }
     },
+    "Since %@": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@から"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自 %@ 起"
+          }
+        }
+      }
+    },
     "Start Recording": {
       "localizations": {
         "en": {
@@ -1065,6 +1293,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "开始记录"
+          }
+        }
+      }
+    },
+    "Statistics appear here once you’ve moved.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移動すると、ここに統計が表示されます。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移动后，统计会显示在这里。"
           }
         }
       }
@@ -1417,6 +1661,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "步行"
+          }
+        }
+      }
+    },
+    "When You’re Out": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "よく出かける時間帯"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "常出门的时段"
+          }
+        }
+      }
+    },
+    "Year": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "年"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "年份"
           }
         }
       }

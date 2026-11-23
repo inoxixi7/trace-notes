@@ -169,6 +169,15 @@ nonisolated final class AppDatabase: Sendable {
         try TrackBounds(segmentID: entry.segmentID, finest: entry.coordinates)?.insert(db)
       }
     }
+    // Statistics (D50): the region of each place. Places named earlier are looked up again for
+    // the region alone.
+    migrator.registerMigration("v8") { db in
+      try db.alter(table: Place.databaseTableName) { table in
+        table.add(column: "countryCode", .text)
+        table.add(column: "countryStatus", .text).notNull().defaults(to: Place.Status.pending.rawValue)
+          .check { [Place.Status.pending.rawValue, Place.Status.resolved.rawValue, Place.Status.failed.rawValue].contains($0) }
+      }
+    }
     return migrator
   }
 
@@ -227,6 +236,9 @@ nonisolated final class AppDatabase: Sendable {
     var lowPowerBeforeCursor: RecorderEvent?
     /// User overrides that lie at least half after the cursor, so only new segments can match them.
     var overrides: [SegmentOverride]
+    /// The points of `lastComplete` before the cursor when it is a stay, for drawing the way out of
+    /// it (D52).
+    var lastStayPoints: [RawPoint] = []
   }
 
   func segmentationInput() async throws -> SegmentationInput {
@@ -259,9 +271,10 @@ nonisolated final class AppDatabase: Sendable {
         .order(SegmentOverride.Columns.createdAt, SegmentOverride.Columns.id)
         .fetchAll(db)
         .filter { $0.endTime.timeIntervalSince(cursor) >= $0.endTime.timeIntervalSince($0.startTime) * SegmentOverride.minimumOverlapShare }
+      let lastStayPoints = try lastComplete.map { $0.kind == .stay ? try Self.points(db, in: $0.start..<cursor) : [] } ?? []
       return SegmentationInput(
         lastComplete: lastComplete, pointBeforeCursor: before, points: points, events: events,
-        activityBeforeCursor: activity, lowPowerBeforeCursor: lowPower, overrides: overrides)
+        activityBeforeCursor: activity, lowPowerBeforeCursor: lowPower, overrides: overrides, lastStayPoints: lastStayPoints)
     }
   }
 
@@ -309,7 +322,11 @@ nonisolated final class AppDatabase: Sendable {
       try Place
         .filter(
           Place.Columns.status == Place.Status.pending
-            || (Place.Columns.status == Place.Status.failed && Place.Columns.nextAttemptAt <= RawPoint.milliseconds(now)))
+            || (Place.Columns.status == Place.Status.failed && Place.Columns.nextAttemptAt <= RawPoint.milliseconds(now))
+            || (Place.Columns.status == Place.Status.resolved
+              && (Place.Columns.countryStatus == Place.Status.pending
+                || (Place.Columns.countryStatus == Place.Status.failed
+                  && Place.Columns.nextAttemptAt <= RawPoint.milliseconds(now)))))
         .order(Place.Columns.createdAt, Place.Columns.id)
         .limit(limit)
         .fetchAll(db)
@@ -328,7 +345,9 @@ nonisolated final class AppDatabase: Sendable {
         Place.Columns.status.set(to: place.status),
         Place.Columns.attempts.set(to: place.attempts),
         Place.Columns.lastAttemptAt.set(to: place.lastAttemptAt.map(RawPoint.milliseconds)),
-        Place.Columns.nextAttemptAt.set(to: place.nextAttemptAt.map(RawPoint.milliseconds)))
+        Place.Columns.nextAttemptAt.set(to: place.nextAttemptAt.map(RawPoint.milliseconds)),
+        Place.Columns.countryCode.set(to: place.countryCode),
+        Place.Columns.countryStatus.set(to: place.countryStatus))
     }
   }
 
@@ -361,7 +380,8 @@ nonisolated final class AppDatabase: Sendable {
     ValueObservation
       .tracking { db in
         PlaceWorkMarker(
-          pendingPlaceIDs: try Int64.fetchAll(db, sql: "SELECT id FROM places WHERE status = 'pending' ORDER BY id"),
+          pendingPlaceIDs: try Int64.fetchAll(
+            db, sql: "SELECT id FROM places WHERE status = 'pending' OR countryStatus = 'pending' ORDER BY id"),
           lastPointID: try Int64.fetchOne(db, sql: "SELECT MAX(id) FROM raw_points"),
           lastEventID: try Int64.fetchOne(db, sql: "SELECT MAX(id) FROM recorder_events"))
       }
@@ -479,6 +499,59 @@ nonisolated final class AppDatabase: Sendable {
       }
       .removeDuplicates()
       .values(in: pool)
+  }
+
+  /// What the overview's statistics are computed from (D50), re-emitted when segments or places
+  /// change. Points are read only for the ends of travelled gaps and are not observed, so new
+  /// points alone do not recompute it.
+  func observeStatisticsInput() -> AsyncValueObservation<TravelStatistics.Input> {
+    ValueObservation
+      .tracking(region: Segment.all(), Place.all()) { db in
+        let segments = try Segment
+          .order(Segment.Columns.start, Segment.Columns.id)
+          .fetchAll(db)
+          .filter { $0.kind != .gap || $0.gapTravelMode != nil }
+        var gapDistances: [Int64: Double] = [:]
+        for gap in segments where gap.kind == .gap {
+          guard let id = gap.id,
+            let entry = try Self.usablePoint(db, before: gap.start),
+            let exit = try Self.usablePoint(db, after: gap.end)
+          else { continue }
+          gapDistances[id] = MotionStateMachine.distance(
+            from: (entry.latitude, entry.longitude), to: (exit.latitude, exit.longitude))
+        }
+        let countries = try Row.fetchAll(
+          db, sql: "SELECT id, countryCode FROM places WHERE countryCode IS NOT NULL")
+        let awaiting = try Int.fetchOne(
+          db, sql: "SELECT COUNT(*) FROM places WHERE countryStatus != ?",
+          arguments: [Place.Status.resolved.rawValue]) ?? 0
+        return TravelStatistics.Input(
+          segments: segments,
+          countryOfPlace: Dictionary(uniqueKeysWithValues: countries.map { ($0["id"], $0["countryCode"]) }),
+          gapDistances: gapDistances,
+          placesAwaitingCountry: awaiting)
+      }
+      .removeDuplicates()
+      .values(in: pool)
+  }
+
+  /// The newest recorded (not replayed) point at or before `instant`, as the gap explainer uses
+  /// for a gap's entry (`TrackProcessor`).
+  private static func usablePoint(_ db: Database, before instant: Date) throws -> RawPoint? {
+    try RawPoint
+      .filter(RawPoint.Columns.timestamp <= RawPoint.milliseconds(instant))
+      .filter(sql: "(flags & ?) = 0", arguments: [RawPoint.Flags.replayed.rawValue])
+      .order(RawPoint.Columns.timestamp.desc, RawPoint.Columns.id.desc)
+      .fetchOne(db)
+  }
+
+  /// The oldest recorded (not replayed) point at or after `instant`, a gap's exit.
+  private static func usablePoint(_ db: Database, after instant: Date) throws -> RawPoint? {
+    try RawPoint
+      .filter(RawPoint.Columns.timestamp >= RawPoint.milliseconds(instant))
+      .filter(sql: "(flags & ?) = 0", arguments: [RawPoint.Flags.replayed.rawValue])
+      .order(RawPoint.Columns.timestamp, RawPoint.Columns.id)
+      .fetchOne(db)
   }
 
   /// Emits once now and again whenever a point or an event has been appended.

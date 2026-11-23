@@ -75,8 +75,7 @@ nonisolated final class TrackProcessor: Sendable {
       let before = index > 0 ? segments[index - 1] : input.lastComplete
       let after = index + 1 < segments.count ? segments[index + 1] : nil
       let track = RenderCache.track(
-        ofMove: input.points.filter { $0.timestamp >= segment.start && $0.timestamp <= segment.end },
-        isComplete: segment.isComplete, from: before?.stayCenter, to: after?.stayCenter)
+        of: segment, previous: before, next: after, points: index > 0 ? input.points : input.lastStayPoints + input.points)
       segments[index].distance = RenderCache.length(of: track)
       if segment.isComplete, track.count > 1 { renderLevels[index] = RenderCache.levels(of: track) }
     }

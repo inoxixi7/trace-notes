@@ -85,6 +85,58 @@ struct SegmenterTests {
     #expect(abs((center - 35) / metre - 840) < 15)
   }
 
+  /// A walk around home at 1 m/s, one point every 2 s, between two still periods there: out
+  /// `radius` metres north (100 s from 900 s), round half a circle at that distance (300 s), and
+  /// straight back (100 s).
+  func strollNearHome(radius: Double = 100) -> [RawPoint] {
+    let out = stride(from: 0.0, to: 100, by: 2).map { point(900 + $0, north: radius * $0 / 100) }
+    let around = stride(from: 0.0, to: 300, by: 2).map { offset in
+      let angle = Double.pi * offset / 300
+      return point(1000 + offset, north: radius * cos(angle), east: radius * sin(angle))
+    }
+    let back = stride(from: 0.0, to: 100, by: 2).map { point(1300 + $0, north: -radius * (1 - $0 / 100)) }
+    return still(from: 0, for: 900, at: 0, drift: 10) + out + around + back + still(from: 1400, for: 900, at: 0, drift: 10)
+  }
+
+  func activity(_ seconds: TimeInterval, _ name: String) -> RecorderEvent {
+    var reading = event(seconds, .motionActivity)
+    reading.payload = "activity=\(name) confidence=high"
+    return reading
+  }
+
+  /// D51 (device, 2026-11-23): a 20-minute walk that stayed within the 150 m stay radius was lost
+  /// in the stay at home. Walking for 2 minutes lets the stay end at the 50 m dwell radius.
+  @Test func walkWithinTheStayRadiusIsAMove() {
+    let readings = [
+      activity(905, "walking"), activity(1000, "unknown"), activity(1100, "walking"), activity(1300, "walking"),
+      activity(1410, "stationary"),
+    ]
+    let segments = segment(strollNearHome(), events: readings)
+    #expect(segments.map(\.kind) == [.stay, .move, .stay])
+    expectContiguous(segments)
+    // Left at the last point within 50 m of the stay's centre (about 950 s, once the walk had
+    // reached 60 m at 1060 s, 2 minutes after the first walking reading); home again about 1350 s.
+    #expect(abs(seconds(segments[1].start) - 950) < 20)
+    #expect(abs(seconds(segments[2].start) - 1350) < 20)
+  }
+
+  /// Without Motion & Fitness, or while it says the phone is still, the 150 m rule alone decides.
+  @Test func driftOrNoMotionDataKeepsTheStay() {
+    #expect(segment(strollNearHome()).map(\.kind) == [.stay])
+    let still = [activity(905, "stationary"), activity(1300, "stationary")]
+    #expect(segment(strollNearHome(), events: still).map(\.kind) == [.stay])
+    // Walking around inside, within the dwell radius, is still the stay.
+    let pacing = [activity(905, "walking"), activity(1300, "walking"), activity(1410, "stationary")]
+    #expect(segment(strollNearHome(radius: 35), events: pacing).map(\.kind) == [.stay])
+  }
+
+  /// Walking that began before the stay (the way in) does not count towards leaving it.
+  @Test func walkingIntoAStayDoesNotEndIt() {
+    let points = walk(from: 0, for: 300) + still(from: 300, for: 1200, at: 420, drift: 30)
+    let readings = [activity(10, "walking"), activity(400, "unknown")]
+    #expect(segment(points, events: readings).map(\.kind) == [.move, .stay])
+  }
+
   /// VS2 decision: a pause shorter than 5 minutes stays part of the move.
   @Test func shortStopStaysInTheMove() {
     let points = walk(from: 0, for: 300) + still(from: 300, for: 180, at: 420, drift: 5)

@@ -38,6 +38,9 @@ struct TodayView: View {
   /// The newest viewport the map asked for, and the tracks read for it.
   @State private var overviewRequest: OverviewRequest?
   @State private var overviewTracks: (request: OverviewRequest, tracks: [Int64: [RenderCache.Coordinate]])?
+  /// The statistics' source while the overview is on, and the year they cover (nil: all, D50).
+  @State private var statisticsInput: TravelStatistics.Input?
+  @State private var statisticsYear: Int?
   #if DEBUG
   @State private var showsDeveloperMenu = false
   #endif
@@ -57,8 +60,8 @@ struct TodayView: View {
   /// to this far above it (the sheet's own margins), gone after `controlsFadeDistance` more.
   private static let controlsFadeSlack: CGFloat = 24
   private static let controlsFadeDistance: CGFloat = 60
-  /// Room kept under the bottom controls when the panel is hidden, for the Apple Maps logo and the
-  /// Legal link, which must stay visible (MapKit gives no API for their size).
+  /// Room kept under the bottom controls until the panel's top is measured, for the Apple Maps logo
+  /// and the Legal link, which must stay visible (MapKit gives no API for their size).
   private static let mapAttributionRoom: CGFloat = 32
   /// Away at least this long, the app opens on today again, as on a fresh launch (D43).
   private static let returnToTodayAfter: TimeInterval = 3600
@@ -69,7 +72,7 @@ struct TodayView: View {
     GeometryReader { geometry in
       TodayMapView(
         day: day, segments: segments, points: points, renderCache: renderCache, focus: focus,
-        bottomInset: showsOverview ? 0 : panelHeight(in: geometry.size.height), overview: overview
+        bottomInset: panelHeight(in: geometry.size.height), overview: overview
       ) { overviewRequest = $0 } onUserMove: {
         hideStatusBubble()
       }
@@ -95,8 +98,9 @@ struct TodayView: View {
         bottomControls(in: geometry)
       }
     }
-    .sheet(isPresented: .constant(!showsOverview)) {
-      timelinePanel
+    // One panel throughout: the day's timeline, or the statistics in the overview (D48 ④, D50).
+    .sheet(isPresented: .constant(true)) {
+      panelContent
         .presentationDetents([collapsedDetent, Self.half, .large], selection: panelDetent)
         .presentationBackgroundInteraction(.enabled(upThrough: Self.half))
         .presentationContentInteraction(.scrolls)
@@ -138,6 +142,10 @@ struct TodayView: View {
       guard showsOverview else { return }
       await observeOverviewBounds()
     }
+    .task(id: showsOverview) {
+      guard showsOverview else { return }
+      await observeStatistics()
+    }
     .task(id: overviewRequest) {
       guard showsOverview, let overviewRequest else { return }
       await observeOverviewTracks(for: overviewRequest)
@@ -149,6 +157,7 @@ struct TodayView: View {
       hasLoadedOverview = false
       overviewRequest = nil
       overviewTracks = nil
+      statisticsInput = nil
     }
     .onChange(of: scenePhase) { _, phase in
       switch phase {
@@ -164,12 +173,11 @@ struct TodayView: View {
     }
   }
 
-  /// The overview button and the map controls, standing on the timeline panel (or on the bottom of
-  /// the screen in the overview, where the panel is hidden).
+  /// The overview button and the map controls, standing on the bottom panel (the timeline, or the
+  /// statistics in the overview).
   private func bottomControls(in geometry: GeometryProxy) -> some View {
     let frame = geometry.frame(in: .global)
     let screenHeight = frame.maxY + geometry.safeAreaInsets.bottom
-    let panelTop = showsOverview ? nil : panelTop
     let lift = panelTop.map { frame.maxY - $0 } ?? Self.mapAttributionRoom
     var opacity = 1.0
     if let panelTop {
@@ -250,6 +258,29 @@ struct TodayView: View {
     loadError = nil
     focus = nil
     day = newDay
+  }
+
+  @ViewBuilder private var panelContent: some View {
+    if showsOverview {
+      StatisticsPanel(
+        input: statisticsInput, year: $statisticsYear, showsList: panelStop != .collapsed,
+        onHeaderHeight: { panelHeaderHeight = $0 })
+    } else {
+      timelinePanel
+    }
+  }
+
+  private func observeStatistics() async {
+    do {
+      for try await input in database.observeStatisticsInput() {
+        statisticsInput = input
+      }
+    } catch is CancellationError {
+      // The overview closed.
+    } catch {
+      AppLog.processing.error("reading statistics failed: \(error.localizedDescription, privacy: .public)")
+      processingError = error.localizedDescription
+    }
   }
 
   private var timelinePanel: some View {
