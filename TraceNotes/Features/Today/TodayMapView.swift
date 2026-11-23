@@ -60,6 +60,16 @@ struct TodayMapView: UIViewRepresentable {
       var kind: Segment.Kind
       var end: Date
       var pointCount: Int
+      /// Moves only: what the track was built from. The day's segments, points and render cache
+      /// arrive separately, in no fixed order; a move drawn before its points or cache came would
+      /// otherwise keep that drawing (device finding: straight lines between stays).
+      var source: Source?
+    }
+
+    private enum Source: Equatable {
+      case renderCache
+      /// Simplified here from this many of the day's points.
+      case points(Int)
     }
 
     private enum Drawn {
@@ -91,7 +101,8 @@ struct TodayMapView: UIViewRepresentable {
       }
       var changes: [Date: TrackGeometry.Track?] = [:]
       let wanted = Dictionary(segments.map { ($0.start, $0) }, uniquingKeysWith: { _, newer in newer })
-      for (start, entry) in drawn where wanted[start].map({ Self.signature(of: $0) != entry.signature }) ?? true {
+      let signature = { (segment: Segment) in Self.signature(of: segment, points: points, renderCache: renderCache) }
+      for (start, entry) in drawn where wanted[start].map({ signature($0) != entry.signature }) ?? true {
         switch entry.item {
         case .track: changes[start] = .some(nil)
         case .stay: break
@@ -102,19 +113,26 @@ struct TodayMapView: UIViewRepresentable {
         switch segment.kind {
         case .move:
           // Completed moves come from the render cache; the open one (or one whose cache has not
-          // arrived yet) is simplified here.
-          let levels = segment.id.flatMap { renderCache[$0] }
-            ?? RenderCache.levels(
+          // arrived yet) is simplified here, once its points have arrived: without them the track
+          // would be just the line between the neighbouring stays.
+          let levels: [[RenderCache.Coordinate]]
+          if let cached = segment.id.flatMap({ renderCache[$0] }) {
+            levels = cached
+          } else {
+            let movePoints = MapFocus.points(of: segment, in: points)
+            if movePoints.isEmpty, segment.pointCount > 0 { continue }
+            levels = RenderCache.levels(
               of: RenderCache.track(
-                ofMove: MapFocus.points(of: segment, in: points), isComplete: segment.isComplete,
+                ofMove: movePoints, isComplete: segment.isComplete,
                 from: index > 0 ? segments[index - 1].stayCenter : nil,
                 to: index + 1 < segments.count ? segments[index + 1].stayCenter : nil))
+          }
           guard let track = TrackGeometry.Track(levels: levels.map { $0.map(DisplayProjection.shared.mapPoint) }) else { continue }
           changes[segment.start] = .some(track)
-          drawn[segment.start] = (Self.signature(of: segment), .track(track.boundingRect))
+          drawn[segment.start] = (signature(segment), .track(track.boundingRect))
         case .stay:
           guard let latitude = segment.centerLatitude, let longitude = segment.centerLongitude else { continue }
-          drawn[segment.start] = (Self.signature(of: segment), .stay(DisplayProjection.shared.mapPoint((latitude, longitude))))
+          drawn[segment.start] = (signature(segment), .stay(DisplayProjection.shared.mapPoint((latitude, longitude))))
         case .gap:
           continue  // drawn as a link, below
         }
@@ -137,6 +155,11 @@ struct TodayMapView: UIViewRepresentable {
       if !hasFramedDay, !waitingForPoints, let rect = boundingRect() {
         hasFramedDay = true
         map.setVisibleMapRect(rect, edgePadding: Self.edgePadding(bottomInset), animated: false)
+        // The path above was built for the zoom before framing (far out after a launch, so the
+        // coarsest level); a jump without animation reports no visible-region change, so pick the
+        // level for the new zoom now.
+        redrawTracks(on: map, force: false)
+        canvas.redraw(on: map)
       }
     }
 
@@ -176,8 +199,12 @@ struct TodayMapView: UIViewRepresentable {
       }
     }
 
-    private static func signature(of segment: Segment) -> Signature {
-      Signature(kind: segment.kind, end: segment.end, pointCount: segment.pointCount)
+    private static func signature(of segment: Segment, points: [RawPoint], renderCache: [Int64: [[RenderCache.Coordinate]]]) -> Signature {
+      var source: Source?
+      if segment.kind == .move {
+        source = segment.id.flatMap { renderCache[$0] } != nil ? .renderCache : .points(MapFocus.points(of: segment, in: points).count)
+      }
+      return Signature(kind: segment.kind, end: segment.end, pointCount: segment.pointCount, source: source)
     }
 
     private static func edgePadding(_ bottomInset: CGFloat) -> UIEdgeInsets {
@@ -201,6 +228,8 @@ struct TodayMapView: UIViewRepresentable {
     }
 
     func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+      // Any camera change ends here, including ones that reported no visible-region change.
+      redrawTracks(on: mapView, force: false)
       canvas.mapDidSettle(mapView)
     }
 
