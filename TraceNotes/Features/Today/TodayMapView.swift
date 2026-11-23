@@ -5,6 +5,9 @@ import SwiftUI
 /// widths from the render cache (VS3, D39); each stay is one dot at its centre, so drift while
 /// still never shows as a scribble (F3); each gap is a dashed link (F6, D42). Everything is drawn
 /// in display coordinates (D31).
+///
+/// The overview (D44) shows every completed move of every day instead, one colour, without stays
+/// or gaps; it reads only the tracks on screen, at the level for the zoom.
 struct TodayMapView: UIViewRepresentable {
   /// The day shown; a new day is framed afresh.
   let day: LocalDay
@@ -17,6 +20,20 @@ struct TodayMapView: UIViewRepresentable {
   let focus: MapFocus?
   /// Height covered by the timeline panel at the bottom, in points.
   let bottomInset: CGFloat
+  /// Set while the overview is on.
+  let overview: Overview?
+  /// The overview needs the tracks for a new viewport or zoom level.
+  let onOverviewRequest: (OverviewRequest) -> Void
+  /// The user started panning or zooming the map (not a move the app made).
+  let onUserMove: () -> Void
+
+  struct Overview {
+    /// The box around all completed moves; nil before the first one.
+    var bounds: GeoBox?
+    /// The tracks read for `request`, by segment ID; nil before the first read.
+    var request: OverviewRequest?
+    var tracks: [Int64: [RenderCache.Coordinate]]
+  }
 
   func makeUIView(context: Context) -> MKMapView {
     let map = MKMapView()
@@ -31,10 +48,23 @@ struct TodayMapView: UIViewRepresentable {
     // The canvas draws the day with one flat map-to-screen transform (D39).
     map.isPitchEnabled = false
     context.coordinator.attach(to: map)
+    // Watch the user's own gestures alongside MapKit's, without taking any touches from them.
+    for recognizer in [UIPanGestureRecognizer(), UIPinchGestureRecognizer()] {
+      recognizer.addTarget(context.coordinator, action: #selector(Coordinator.userGesture(_:)))
+      recognizer.cancelsTouchesInView = false
+      recognizer.delegate = context.coordinator
+      map.addGestureRecognizer(recognizer)
+    }
     return map
   }
 
   func updateUIView(_ map: MKMapView, context: Context) {
+    context.coordinator.onOverviewRequest = onOverviewRequest
+    context.coordinator.onUserMove = onUserMove
+    if let overview {
+      context.coordinator.showOverview(overview, on: map, bottomInset: bottomInset)
+      return
+    }
     context.coordinator.show(day: day, segments: segments, points: points, renderCache: renderCache, on: map, bottomInset: bottomInset)
     if let focus { context.coordinator.move(to: focus, on: map, bottomInset: bottomInset) }
   }
@@ -43,16 +73,35 @@ struct TodayMapView: UIViewRepresentable {
     Coordinator()
   }
 
-  final class Coordinator: NSObject, MKMapViewDelegate {
+  final class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegate {
     /// What is drawn for each segment, keyed by its start, so unchanged segments are kept.
     private var drawn: [Date: (signature: Signature, item: Drawn)] = [:]
-    private var tracks = TrackGeometry()
+    private var tracks = TrackGeometry<Date>()
     /// The render-cache level the canvas's path was built from.
     private var drawnLevel: Int?
     private var hasFramedDay = false
     private var shownDay: LocalDay?
     private var shownFocus: UUID?
     private let canvas = TrackCanvas()
+    private var isShowingOverview = false
+    private var hasFramedOverview = false
+    /// The read whose tracks are drawn, and the newest one asked for.
+    private var drawnOverview: OverviewRequest?
+    private var askedOverview: OverviewRequest?
+    var onOverviewRequest: ((OverviewRequest) -> Void)?
+    var onUserMove: (() -> Void)?
+
+    @objc func userGesture(_ recognizer: UIGestureRecognizer) {
+      guard recognizer.state == .began else { return }
+      onUserMove?()
+    }
+
+    func gestureRecognizer(
+      _ gestureRecognizer: UIGestureRecognizer,
+      shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
+    ) -> Bool {
+      true
+    }
     /// Room around framed content, in points (plus the panel's height at the bottom).
     private static let padding = UIEdgeInsets(top: 120, left: 40, bottom: 40, right: 40)
 
@@ -95,11 +144,20 @@ struct TodayMapView: UIViewRepresentable {
     }
 
     func show(day: LocalDay, segments: [Segment], points: [RawPoint], renderCache: [Int64: [[RenderCache.Coordinate]]], on map: MKMapView, bottomInset: CGFloat) {
+      if isShowingOverview {
+        // Back from the overview: draw the day afresh and frame it again.
+        isShowingOverview = false
+        drawn = [:]
+        tracks = TrackGeometry()
+        drawnLevel = nil
+        hasFramedDay = false
+        canvas.setTracks(nil, origin: MKMapPoint(x: 0, y: 0))
+      }
       if day != shownDay {
         shownDay = day
         hasFramedDay = false
       }
-      var changes: [Date: TrackGeometry.Track?] = [:]
+      var changes: [Date: TrackGeometry<Date>.Track?] = [:]
       let wanted = Dictionary(segments.map { ($0.start, $0) }, uniquingKeysWith: { _, newer in newer })
       let signature = { (segment: Segment) in Self.signature(of: segment, points: points, renderCache: renderCache) }
       for (start, entry) in drawn where wanted[start].map({ signature($0) != entry.signature }) ?? true {
@@ -127,7 +185,7 @@ struct TodayMapView: UIViewRepresentable {
                 from: index > 0 ? segments[index - 1].stayCenter : nil,
                 to: index + 1 < segments.count ? segments[index + 1].stayCenter : nil))
           }
-          guard let track = TrackGeometry.Track(levels: levels.map { $0.map(DisplayProjection.shared.mapPoint) }) else { continue }
+          guard let track = TrackGeometry<Date>.Track(levels: levels.map { $0.map(DisplayProjection.shared.mapPoint) }) else { continue }
           changes[segment.start] = .some(track)
           drawn[segment.start] = (signature(segment), .track(track.boundingRect))
         case .stay:
@@ -161,6 +219,54 @@ struct TodayMapView: UIViewRepresentable {
         redrawTracks(on: map, force: false)
         canvas.redraw(on: map)
       }
+    }
+
+    /// Replaces the day with the overview's tracks; frames all of them once per opening.
+    func showOverview(_ overview: Overview, on map: MKMapView, bottomInset: CGFloat) {
+      if !isShowingOverview {
+        isShowingOverview = true
+        hasFramedOverview = false
+        drawnOverview = nil
+        askedOverview = nil
+        canvas.setTracks(nil, origin: MKMapPoint(x: 0, y: 0))
+        canvas.setStays([])
+        canvas.setLinks([])
+        canvas.redraw(on: map)
+      }
+      if !hasFramedOverview, let bounds = overview.bounds, let rect = Self.rect(of: bounds) {
+        hasFramedOverview = true
+        // Without animation the visible rect is final at once (and no region change is reported).
+        map.setVisibleMapRect(rect, edgePadding: Self.edgePadding(bottomInset), animated: false)
+        canvas.keepAnchorsNearCentre(on: map)
+        requestOverview(on: map)
+      }
+      guard let request = overview.request, request != drawnOverview else { return }
+      drawnOverview = request
+      var geometry = TrackGeometry<Int64>()
+      geometry.update(overview.tracks.mapValues { TrackGeometry<Int64>.Track(levels: [$0.map(DisplayProjection.shared.mapPoint)]) })
+      let origin = geometry.origin ?? MKMapPoint(x: 0, y: 0)
+      canvas.setTracks(geometry.origin.map { geometry.path(atLevel: 0, origin: $0) }, origin: origin)
+      canvas.redraw(on: map)
+    }
+
+    /// Asks for the tracks of the visible area unless the last read already covers it.
+    private func requestOverview(on map: MKMapView) {
+      let level = Self.level(on: map)
+      let visible = map.visibleMapRect
+      guard visible.width > 0, askedOverview?.covers(visible, level: level) != true else { return }
+      let request = OverviewRequest(visible: visible, level: level)
+      askedOverview = request
+      // Called while SwiftUI updates the view (framing), so the state change waits for the next turn.
+      let onOverviewRequest = onOverviewRequest
+      Task { @MainActor in onOverviewRequest?(request) }
+    }
+
+    /// The display rect of a stored box, at least `MapFocus.minimumSpan` across.
+    private static func rect(of box: GeoBox) -> MKMapRect? {
+      let corners = box.longitudes.flatMap { longitudes in
+        [(box.latitudes.upperBound, longitudes.lowerBound), (box.latitudes.lowerBound, longitudes.upperBound)]
+      }
+      return MapFocus.enclosing(corners.map { DisplayProjection.shared.mapPoint($0).coordinate })?.rect
     }
 
     func move(to focus: MapFocus, on map: MKMapView, bottomInset: CGFloat) {
@@ -223,13 +329,13 @@ struct TodayMapView: UIViewRepresentable {
     }
 
     func mapViewDidChangeVisibleRegion(_ mapView: MKMapView) {
-      redrawTracks(on: mapView, force: false)
+      if !isShowingOverview { redrawTracks(on: mapView, force: false) }
       canvas.keepAnchorsNearCentre(on: mapView)
     }
 
     func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
       // Any camera change ends here, including ones that reported no visible-region change.
-      redrawTracks(on: mapView, force: false)
+      if isShowingOverview { requestOverview(on: mapView) } else { redrawTracks(on: mapView, force: false) }
       canvas.mapDidSettle(mapView)
     }
 
@@ -289,7 +395,7 @@ struct MapFocus: Equatable {
     return points[lower..<upper].filter { !$0.flags.contains(.replayed) }
   }
 
-  private static func enclosing(_ coordinates: [CLLocationCoordinate2D]) -> MapFocus? {
+  static func enclosing(_ coordinates: [CLLocationCoordinate2D]) -> MapFocus? {
     guard let first = coordinates.first else { return nil }
     guard coordinates.count > 1 else { return around(first) }
     let line = MKPolyline(coordinates: coordinates, count: coordinates.count)

@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 
 /// F8: the day on screen, with the previous and next day either side; tapping the date opens the
-/// month calendar (VS7, D43).
+/// month calendar (VS7, D43). It heads the timeline panel, whose glass it sits on (D48).
 struct DayBar: View {
   let day: LocalDay
   let today: LocalDay
@@ -20,6 +20,7 @@ struct DayBar: View {
       Button(action: onOpenCalendar) {
         DayTitle(day: day, today: today)
           .font(.subheadline.weight(.semibold))
+          .lineLimit(1)
           .frame(minWidth: 120, minHeight: 44)
           .contentShape(.rect)
       }
@@ -34,7 +35,7 @@ struct DayBar: View {
     }
     .buttonStyle(.plain)
     .foregroundStyle(.primary)
-    .glassEffect(.regular.interactive(), in: .capsule)
+    .background(.fill.tertiary, in: .capsule)
   }
 }
 

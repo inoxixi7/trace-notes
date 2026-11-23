@@ -1,7 +1,9 @@
 import CoreLocation
 import CoreMotion
+import SwiftUI
+import UIKit
 
-/// What the top capsule on Today says (PRODUCT F1 state table). Pause arrives with VS9.
+/// What the status button and card on Today say (PRODUCT F1 state table). Pause arrives with VS9.
 enum RecordingStatus: Equatable {
   case recording
   /// Authorization not answered yet.
@@ -43,5 +45,53 @@ enum RecordingStatus: Equatable {
 
   var isProblem: Bool {
     self != .recording
+  }
+
+  var title: Text {
+    switch self {
+    case .recording: Text("Recording")
+    case .waitingForPermission: Text("Waiting for location access")
+    case .backgroundUnavailable: Text("Can’t record in the background")
+    case .notRecording: Text("Not recording")
+    case .locationServicesOff: Text("Location Services are off")
+    // Debug builds only; not localized.
+    case .yieldingToSpike: Text(verbatim: "Paused: the S1 spike recorder is running")
+    }
+  }
+
+  var detail: Text? {
+    switch self {
+    case .recording, .waitingForPermission, .yieldingToSpike: nil
+    case .backgroundUnavailable: Text("Location access is set to “While Using the App”. Choose “Always” to keep recording when the app is closed.")
+    case .notRecording: Text("Location access is off for Trace Notes. Your saved history is still here.")
+    case .locationServicesOff: Text("Turn on Location Services in Settings to record.")
+    }
+  }
+
+  var symbol: String {
+    switch self {
+    case .recording: "record.circle"
+    case .waitingForPermission: "location"
+    case .backgroundUnavailable, .notRecording, .locationServicesOff: "location.slash"
+    case .yieldingToSpike: "pause.circle"
+    }
+  }
+
+  /// The status button's colour, so the state reads at a glance (D49).
+  var color: Color {
+    switch self {
+    case .recording: .green
+    case .waitingForPermission: .yellow
+    case .backgroundUnavailable: .orange
+    case .notRecording, .locationServicesOff: .red
+    case .yieldingToSpike: .gray
+    }
+  }
+
+  static let motionDeniedNote = Text("Motion & Fitness is off, so transport is judged by speed only.")
+
+  @MainActor static func openSettings() {
+    guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+    UIApplication.shared.open(url)
   }
 }

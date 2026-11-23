@@ -153,6 +153,22 @@ nonisolated final class AppDatabase: Sendable {
           .check { GapReason.allCases.map(\.rawValue).contains($0) }
       }
     }
+    // Overview (D44): the box around each completed move's track, for the viewport query. Filled
+    // from the render cache that is already stored; afterwards written with the cache.
+    migrator.registerMigration("v7") { db in
+      try db.create(table: TrackBounds.databaseTableName) { table in
+        table.primaryKey("segmentID", .integer)
+          .references(Segment.databaseTableName, onDelete: .cascade)
+        table.column("minLatitude", .integer).notNull()  // degrees × 10⁷, WGS-84
+        table.column("maxLatitude", .integer).notNull()
+        table.column("minLongitude", .integer).notNull()
+        table.column("maxLongitude", .integer).notNull()
+      }
+      let finest = try RenderCacheEntry.filter(RenderCacheEntry.Columns.level == 0).fetchCursor(db)
+      while let entry = try finest.next() {
+        try TrackBounds(segmentID: entry.segmentID, finest: entry.coordinates)?.insert(db)
+      }
+    }
     return migrator
   }
 
@@ -264,6 +280,7 @@ nonisolated final class AppDatabase: Sendable {
         for (level, coordinates) in levels.enumerated() {
           try RenderCacheEntry(segmentID: segmentID, level: level, coordinates: coordinates).insert(db)
         }
+        if let finest = levels.first { try TrackBounds(segmentID: segmentID, finest: finest)?.insert(db) }
       }
     }
   }
@@ -383,6 +400,48 @@ nonisolated final class AppDatabase: Sendable {
             ORDER BY render_cache.segmentID, render_cache.level
             """, arguments: [day.description])
         return Dictionary(grouping: entries, by: \.segmentID).mapValues { $0.map(\.coordinates) }
+      }
+      .values(in: pool)
+  }
+
+  /// The box around every completed move's track (the overview's first frame, D44); nil before the
+  /// first move completes. Re-emitted when moves complete.
+  func observeOverviewBounds() -> AsyncValueObservation<GeoBox?> {
+    ValueObservation
+      .tracking { db -> GeoBox? in
+        guard
+          let row = try Row.fetchOne(
+            db, sql: """
+              SELECT MIN(minLatitude), MAX(maxLatitude), MIN(minLongitude), MAX(maxLongitude) FROM track_bounds
+              """),
+          let minLatitude = row[0] as Int64?, let maxLatitude = row[1] as Int64?,
+          let minLongitude = row[2] as Int64?, let maxLongitude = row[3] as Int64?
+        else { return nil }
+        let degrees = { (value: Int64) in Double(value) / RawPoint.coordinateScale }
+        return GeoBox(
+          latitudes: degrees(minLatitude)...degrees(maxLatitude), longitudes: [degrees(minLongitude)...degrees(maxLongitude)])
+      }
+      .removeDuplicates()
+      .values(in: pool)
+  }
+
+  /// The overview's tracks (D44): every completed move whose box meets `box`, at one render-cache
+  /// level, by segment ID. Re-emitted when moves complete.
+  func observeOverviewTracks(in box: GeoBox, level: Int) -> AsyncValueObservation<[Int64: [RenderCache.Coordinate]]> {
+    let longitudes = box.longitudes.map { _ in "(track_bounds.maxLongitude >= ? AND track_bounds.minLongitude <= ?)" }
+    let bounds = [box.latitudes] + box.longitudes
+    let arguments = StatementArguments(
+      [Int64(level)] + bounds.flatMap { [RawPoint.scaled($0.lowerBound), RawPoint.scaled($0.upperBound)] })
+    let sql = """
+      SELECT render_cache.* FROM track_bounds
+      JOIN render_cache ON render_cache.segmentID = track_bounds.segmentID AND render_cache.level = ?
+      WHERE track_bounds.maxLatitude >= ? AND track_bounds.minLatitude <= ?
+      AND (\(longitudes.isEmpty ? "0" : longitudes.joined(separator: " OR ")))
+      """
+    return ValueObservation
+      .tracking { db in
+        let entries = try RenderCacheEntry.fetchAll(db, sql: sql, arguments: arguments)
+        return Dictionary(entries.map { ($0.segmentID, $0.coordinates) }, uniquingKeysWith: { first, _ in first })
       }
       .values(in: pool)
   }

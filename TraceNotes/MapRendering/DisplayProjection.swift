@@ -17,6 +17,10 @@ nonisolated struct DisplayProjection: Sendable {
     }
   }()
 
+  /// The furthest a drawn position lies from its stored one: GCJ-02 moves points by well under a
+  /// kilometre. Queries by stored coordinates widen a screen area by this much.
+  static let maximumShift: CLLocationDistance = 1_000
+
   func mapPoint(_ coordinate: RenderCache.Coordinate) -> MKMapPoint {
     let stored = CLLocationCoordinate2D(latitude: coordinate.latitude, longitude: coordinate.longitude)
     return MKMapPoint(policy?.displayCoordinate(for: stored) ?? stored)

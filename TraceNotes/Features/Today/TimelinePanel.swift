@@ -2,11 +2,20 @@ import SwiftUI
 
 /// Today's timeline (F8, VS2): stays, moves and gaps in time order, moves with their transport
 /// mode (F4, VS4), stays with their place (F5, VS5) and gaps with their cause or the mode they
-/// were travelled by (F6, VS6).
+/// were travelled by (F6, VS6). Its header is the day bar and a one-line summary of the day, which
+/// is all the collapsed panel shows (D48).
 struct TimelinePanel: View {
+  let day: LocalDay
+  let today: LocalDay
   let segments: [Segment]
   let places: [Int64: Place]
   let processingError: String?
+  /// False while collapsed to the header, so no row peeks out under it.
+  let showsList: Bool
+  /// Reports the header's height, which the collapsed detent is made of (D49).
+  let onHeaderHeight: (CGFloat) -> Void
+  let onChangeDay: (LocalDay) -> Void
+  let onOpenCalendar: () -> Void
   let onSelect: (Segment) -> Void
   let onChangeMode: (Segment, TransportMode) -> Void
   let onRenamePlace: (Int64, String?) -> Void
@@ -17,7 +26,14 @@ struct TimelinePanel: View {
   #endif
 
   var body: some View {
-    NavigationStack {
+    VStack(spacing: 0) {
+      header
+        // Measured so the collapsed panel is exactly the header (D48, D49).
+        .onGeometryChange(for: CGFloat.self) { proxy in
+          proxy.size.height
+        } action: { height in
+          onHeaderHeight(height)
+        }
       ScrollViewReader { proxy in
         List {
           if let processingError {
@@ -58,6 +74,8 @@ struct TimelinePanel: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .opacity(showsList ? 1 : 0)
+        .animation(.default, value: showsList)
         // Rows are in time order (F8); today's newest one is what matters, so show it when the
         // list first fills and whenever a new segment begins.
         .onChange(of: segments.last?.start, initial: true) { _, newest in
@@ -74,18 +92,64 @@ struct TimelinePanel: View {
       } message: {
         Text("The new name is shown for every visit to this place.")
       }
-      .navigationTitle(Text("Timeline"))
-      .navigationBarTitleDisplayMode(.inline)
-      #if DEBUG
-      .toolbar {
-        Button(action: onOpenDeveloperMenu) {
-          Image(systemName: "hammer")
-        }
-        .accessibilityLabel(Text(verbatim: "Developer"))
-      }
-      #endif
     }
   }
+
+  private var header: some View {
+    VStack(spacing: 6) {
+      DayBar(day: day, today: today, onChange: onChangeDay, onOpenCalendar: onOpenCalendar)
+        .padding(.horizontal, Self.dayBarInset)
+        #if DEBUG
+        .overlay(alignment: .trailing) {
+          Button(action: onOpenDeveloperMenu) {
+            Image(systemName: "hammer")
+              .frame(width: 44, height: 44)
+              .contentShape(.rect)
+          }
+          .buttonStyle(.plain)
+          .foregroundStyle(.secondary)
+          .accessibilityLabel(Text(verbatim: "Developer"))
+        }
+        #endif
+      DaySummary(segments: segments)
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+    }
+    .padding(.horizontal)
+    .padding(.top, Self.headerTopPadding)
+    .padding(.bottom, 8)
+  }
+
+  /// Below the sheet's drag indicator.
+  private static let headerTopPadding: CGFloat = 18
+  /// Side room around the day bar (for the Debug button on the right, kept on both sides).
+  private static let dayBarInset: CGFloat = 48
+}
+
+/// One line under the day bar: how many stays and how far the moves went (D48). Empty for a day
+/// without either; the list says so.
+private struct DaySummary: View {
+  let segments: [Segment]
+
+  var body: some View {
+    let stays = segments.count { $0.kind == .stay }
+    let metres = segments.filter { $0.kind == .move }.map(\.distance).reduce(0, +)
+    HStack(spacing: 6) {
+      if stays > 0 {
+        Text("\(stays) stays")
+      }
+      if stays > 0, metres > 0 {
+        Text(verbatim: "·")
+      }
+      if metres > 0 {
+        Text(verbatim: Measurement(value: metres, unit: UnitLength.meters).formatted(.measurement(width: .abbreviated, usage: .road)))
+      }
+    }
+    // Keeps the collapsed panel the same height on an empty day.
+    .frame(minHeight: lineHeight)
+  }
+
+  @ScaledMetric(relativeTo: .footnote) private var lineHeight: CGFloat = 18
 }
 
 extension TimelinePanel {

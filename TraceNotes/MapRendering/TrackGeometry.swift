@@ -1,12 +1,13 @@
 import MapKit
 
-/// The day's moves as map geometry (ARCHITECTURE §6.3), keyed by segment start.
+/// Moves as map geometry (ARCHITECTURE §6.3): the day's keyed by segment start, the overview's by
+/// segment ID (D44).
 ///
 /// Drawn as one Bézier path in screen space by `TrackCanvas`, so the smooth curve (D30, D38) stays
 /// smooth at every zoom and its width stays in screen points (F7). MapKit's own polyline renderer
 /// (D33) needed the curve flattened into straight pieces, which showed as facets when zoomed in all
 /// the way (device finding, D39).
-nonisolated struct TrackGeometry {
+nonisolated struct TrackGeometry<Key: Hashable & Comparable> {
   /// One move, already in display coordinates (D31), at every render-cache level, finest first.
   struct Track {
     let levels: [[MKMapPoint]]
@@ -26,10 +27,10 @@ nonisolated struct TrackGeometry {
     }
   }
 
-  private(set) var tracks: [Date: Track] = [:]
+  private(set) var tracks: [Key: Track] = [:]
 
   /// Replaces the tracks with these keys (nil removes).
-  mutating func update(_ changes: [Date: Track?]) {
+  mutating func update(_ changes: [Key: Track?]) {
     for (key, track) in changes { tracks[key] = track }
   }
 
