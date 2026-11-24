@@ -65,7 +65,7 @@ Note: PRODUCT.md and DECISIONS.md only name S1 and S2. S3 is defined in the task
 3. VS7.6, VS8 and VS10 device checks (you): see the VS7.5, VS8 and VS10 lists (VS8.5 passed on the device)
 4. S1 device tests (you), then decide the final F2 approach. The main app no longer ships S1's Control Center widget: run T1–T7 from a build of commit `f75ba95` or earlier
 5. S2: mainland device test on the next trip (finds the signal D31 needs)
-6. S3 device days (you). TN S3 and the formal app must not record at the same time: on S3 days set Trace Notes' location access to Never
+6. Battery days with the formal app (you, from 2026-11-24): see "Battery days". They replace the S3 device days for strategy B; A and C are tried only if B misses 3 %
 
 ## VS1 device checks
 
@@ -188,6 +188,26 @@ All passed on the device (user, 2026-11-24): import, smooth lines at every zoom,
 3. A day or more after installing: the report shows at least one MetricKit report (MetricKit delivers about once a day).
 4. About: version, Privacy Policy and Open-Source Licenses read correctly.
 5. Delete All Data → the dialog states your days and distance; "Export GPX First" opens the export with all records selected. **Only when you really want to start over**: Delete All Data → Delete; "All data was deleted.", Today and the overview are empty, settings (appearance, fog visibility) are kept, and recording goes on (the next walk shows up).
+
+## Battery days (formal app, strategy B)
+
+Measured with the formal app instead of TN S3: since VS10 its diagnostic report contains the MetricKit reports (GPS time by accuracy, CPU time, wake-ups), delivered about once a day. From 2026-11-24 11:36 a **Release** build is on the phone (Debug builds cost more CPU).
+
+Baseline before the Release build (user's screenshot of Settings › Battery › Trace Notes, Debug builds, 2026-11-24 11:34). These are Trace Notes' **share of the battery used**, not of the battery's capacity:
+
+| Day | Share | Notes |
+|---|---|---|
+| Sun 11-22 | about 13 % | Debug build |
+| Mon 11-23 | about 21 % (about 11 % by 11:34) | Debug build |
+| Tue 11-24 until 11:34 | 9 % | Debug builds, several reinstalls; 14 min on screen, 2 h 13 min in the background |
+
+Each day (you), for 2–3 ordinary days:
+
+1. Before bed, from Settings › Battery: Trace Notes' share for the day ("24 hours" view), and the total battery drop for the day (the battery level graph; note any charging).
+2. Roughly how long you were out moving (walk / train / car).
+3. On the last day: Settings › Diagnostics › Diagnostic Report → share it to me.
+
+Cost per day ≈ share × total drop. The target is < 3 % of the battery per day (PRODUCT §6, D25); S3-result §8 lists the levers in order.
 
 ## Known risks
 
