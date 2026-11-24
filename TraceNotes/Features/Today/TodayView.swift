@@ -115,7 +115,7 @@ struct TodayView: View {
     .sheet(isPresented: .constant(true)) {
       panelContent
         .sheet(isPresented: $showsSettings) {
-          SettingsView(database: database, day: day, openedFile: $openedGPX)
+          SettingsView(database: database, engine: engine, day: day, openedFile: $openedGPX)
         }
         .presentationDetents([collapsedDetent, Self.half, .large], selection: panelDetent)
         .presentationBackgroundInteraction(.enabled(upThrough: Self.half))

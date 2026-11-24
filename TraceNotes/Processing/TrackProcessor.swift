@@ -29,8 +29,16 @@ nonisolated final class TrackProcessor: Sendable {
     }
   }
 
-  /// One run: segment everything after the last completed segment and store the result.
+  /// One run: segment everything after the last completed segment and store the result. Reads
+  /// again when the data changed underneath (all data deleted, D55 ②).
   func process(now: Date) async throws {
+    while try await !processOnce(now: now) {
+      AppLog.processing.notice("the derived layer changed while processing; reading again")
+    }
+  }
+
+  /// False when the result was not stored because the data changed after it was read.
+  private func processOnce(now: Date) async throws -> Bool {
     let input = try await database.segmentationInput()
     let seed: Segmenter.Seed
     if let last = input.lastComplete, last.continuesNextDay {
@@ -79,7 +87,7 @@ nonisolated final class TrackProcessor: Sendable {
       segments[index].distance = RenderCache.length(of: track)
       if segment.isComplete, track.count > 1 { renderLevels[index] = RenderCache.levels(of: track) }
     }
-    try await database.replaceOpenSegments(with: segments, renderLevels: renderLevels)
+    return try await database.replaceOpenSegments(madeFrom: input, with: segments, renderLevels: renderLevels)
   }
 
   private func explain(_ gap: inout Segment, input: AppDatabase.SegmentationInput, activities: [TransportClassifier.ActivityReading]) {

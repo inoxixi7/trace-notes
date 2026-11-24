@@ -53,6 +53,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Diagnostics/AppLog.swift,
+				Diagnostics/DiagnosticReport.swift,
 				Geo/CatmullRom.swift,
 				Geo/DouglasPeucker.swift,
 				ImportExport/FogOfWorld.swift,
@@ -83,6 +84,7 @@
 				Storage/GapReason.swift,
 				Storage/GeoBox.swift,
 				Storage/LocalDay.swift,
+				Storage/MetricReport.swift,
 				Storage/Place.swift,
 				Storage/RawPoint.swift,
 				Storage/RecorderEvent.swift,

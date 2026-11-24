@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import os
 
 /// The app's single database (ARCHITECTURE §3): a GRDB `DatabasePool` in WAL mode, so the
 /// recording engine can write in the background while the UI reads.
@@ -59,14 +60,10 @@ nonisolated final class AppDatabase: Sendable {
       }
       try db.create(index: "recorder_events_on_timestamp", on: RecorderEvent.databaseTableName, columns: ["timestamp"])
 
-      // The raw layer is append-only (P5). "Delete all data" removes the database file instead.
-      for table in [RawPoint.databaseTableName, RecorderEvent.databaseTableName] {
+      // The raw layer is append-only (P5); only "Delete all data" lifts this (`deleteAllData`).
+      for table in Self.rawTables {
         for operation in ["UPDATE", "DELETE"] {
-          try db.execute(
-            sql: """
-              CREATE TRIGGER \(table)_no_\(operation.lowercased()) BEFORE \(operation) ON \(table)
-              BEGIN SELECT RAISE(ABORT, '\(table) is append-only'); END
-              """)
+          try db.execute(sql: Self.appendOnlyTrigger(on: table, refusing: operation))
         }
       }
     }
@@ -194,6 +191,15 @@ nonisolated final class AppDatabase: Sendable {
         table.column("importedAt", .integer).notNull()  // UTC milliseconds
       }
     }
+    migrator.registerMigration("v10") { db in
+      // D55 ⑤: MetricKit's reports, kept on the phone for the diagnostic report only.
+      try db.create(table: "metric_reports") { table in
+        table.autoIncrementedPrimaryKey("id")
+        table.column("receivedAt", .integer).notNull().indexed()  // UTC milliseconds
+        table.column("kind", .text).notNull()  // MetricReport.Kind
+        table.column("json", .text).notNull()
+      }
+    }
     return migrator
   }
 
@@ -298,19 +304,38 @@ nonisolated final class AppDatabase: Sendable {
   /// run and the new open one.
   /// `renderLevels[i]` are the simplification levels of `segments[i]` (completed moves only).
   func replaceOpenSegments(with segments: [Segment], renderLevels: [Int: [[RenderCache.Coordinate]]] = [:]) async throws {
+    try await pool.write { db in try Self.replaceOpenSegments(db, with: segments, renderLevels: renderLevels) }
+  }
+
+  /// The same, for segments made from `input`: writes nothing and returns false when the newest
+  /// completed segment is no longer `input.lastComplete`, because all data was deleted while the
+  /// run worked (D55 ②) or another run stored first. The caller reads again.
+  func replaceOpenSegments(
+    madeFrom input: SegmentationInput, with segments: [Segment], renderLevels: [Int: [[RenderCache.Coordinate]]]
+  ) async throws -> Bool {
     try await pool.write { db in
-      try Segment.filter(Segment.Columns.isComplete == false).deleteAll(db)
-      for (index, var segment) in segments.enumerated() {
-        if segment.kind == .stay, let latitude = segment.centerLatitude, let longitude = segment.centerLongitude {
-          segment.placeID = try Self.placeID(db, latitude: latitude, longitude: longitude, createdAt: segment.start)
-        }
-        try segment.insert(db)
-        guard let levels = renderLevels[index], let segmentID = segment.id else { continue }
-        for (level, coordinates) in levels.enumerated() {
-          try RenderCacheEntry(segmentID: segmentID, level: level, coordinates: coordinates).insert(db)
-        }
-        if let finest = levels.first { try TrackBounds(segmentID: segmentID, finest: finest)?.insert(db) }
+      let lastComplete = try Int64.fetchOne(
+        db, sql: "SELECT id FROM segments WHERE isComplete = 1 ORDER BY \"end\" DESC, id DESC LIMIT 1")
+      guard lastComplete == input.lastComplete?.id else { return false }
+      try Self.replaceOpenSegments(db, with: segments, renderLevels: renderLevels)
+      return true
+    }
+  }
+
+  private static func replaceOpenSegments(
+    _ db: Database, with segments: [Segment], renderLevels: [Int: [[RenderCache.Coordinate]]]
+  ) throws {
+    try Segment.filter(Segment.Columns.isComplete == false).deleteAll(db)
+    for (index, var segment) in segments.enumerated() {
+      if segment.kind == .stay, let latitude = segment.centerLatitude, let longitude = segment.centerLongitude {
+        segment.placeID = try Self.placeID(db, latitude: latitude, longitude: longitude, createdAt: segment.start)
       }
+      try segment.insert(db)
+      guard let levels = renderLevels[index], let segmentID = segment.id else { continue }
+      for (level, coordinates) in levels.enumerated() {
+        try RenderCacheEntry(segmentID: segmentID, level: level, coordinates: coordinates).insert(db)
+      }
+      if let finest = levels.first { try TrackBounds(segmentID: segmentID, finest: finest)?.insert(db) }
     }
   }
 
@@ -528,33 +553,35 @@ nonisolated final class AppDatabase: Sendable {
   /// points alone do not recompute it.
   func observeStatisticsInput() -> AsyncValueObservation<TravelStatistics.Input> {
     ValueObservation
-      .tracking(region: Segment.all(), Place.all()) { db in
-        let segments = try Segment
-          .order(Segment.Columns.start, Segment.Columns.id)
-          .fetchAll(db)
-          .filter { $0.kind != .gap || $0.gapTravelMode != nil }
-        var gapDistances: [Int64: Double] = [:]
-        for gap in segments where gap.kind == .gap {
-          guard let id = gap.id,
-            let entry = try Self.usablePoint(db, before: gap.start),
-            let exit = try Self.usablePoint(db, after: gap.end)
-          else { continue }
-          gapDistances[id] = MotionStateMachine.distance(
-            from: (entry.latitude, entry.longitude), to: (exit.latitude, exit.longitude))
-        }
-        let countries = try Row.fetchAll(
-          db, sql: "SELECT id, countryCode FROM places WHERE countryCode IS NOT NULL")
-        let awaiting = try Int.fetchOne(
-          db, sql: "SELECT COUNT(*) FROM places WHERE countryStatus != ?",
-          arguments: [Place.Status.resolved.rawValue]) ?? 0
-        return TravelStatistics.Input(
-          segments: segments,
-          countryOfPlace: Dictionary(uniqueKeysWithValues: countries.map { ($0["id"], $0["countryCode"]) }),
-          gapDistances: gapDistances,
-          placesAwaitingCountry: awaiting)
-      }
+      .tracking(region: Segment.all(), Place.all()) { db in try Self.statisticsInput(db) }
       .removeDuplicates()
       .values(in: pool)
+  }
+
+  private static func statisticsInput(_ db: Database) throws -> TravelStatistics.Input {
+    let segments = try Segment
+      .order(Segment.Columns.start, Segment.Columns.id)
+      .fetchAll(db)
+      .filter { $0.kind != .gap || $0.gapTravelMode != nil }
+    var gapDistances: [Int64: Double] = [:]
+    for gap in segments where gap.kind == .gap {
+      guard let id = gap.id,
+        let entry = try Self.usablePoint(db, before: gap.start),
+        let exit = try Self.usablePoint(db, after: gap.end)
+      else { continue }
+      gapDistances[id] = MotionStateMachine.distance(
+        from: (entry.latitude, entry.longitude), to: (exit.latitude, exit.longitude))
+    }
+    let countries = try Row.fetchAll(
+      db, sql: "SELECT id, countryCode FROM places WHERE countryCode IS NOT NULL")
+    let awaiting = try Int.fetchOne(
+      db, sql: "SELECT COUNT(*) FROM places WHERE countryStatus != ?",
+      arguments: [Place.Status.resolved.rawValue]) ?? 0
+    return TravelStatistics.Input(
+      segments: segments,
+      countryOfPlace: Dictionary(uniqueKeysWithValues: countries.map { ($0["id"], $0["countryCode"]) }),
+      gapDistances: gapDistances,
+      placesAwaitingCountry: awaiting)
   }
 
   /// The newest recorded (not replayed) point at or before `instant`, as the gap explainer uses
@@ -811,5 +838,101 @@ nonisolated final class AppDatabase: Sendable {
       }
       .removeDuplicates()
       .values(in: pool)
+  }
+
+  // MARK: - Delete all data (F10, D55 ②)
+
+  private static let rawTables = [RawPoint.databaseTableName, RecorderEvent.databaseTableName]
+
+  private static func appendOnlyTrigger(on table: String, refusing operation: String) -> String {
+    """
+    CREATE TRIGGER \(table)_no_\(operation.lowercased()) BEFORE \(operation) ON \(table)
+    BEGIN SELECT RAISE(ABORT, '\(table) is append-only'); END
+    """
+  }
+
+  /// Empties every table: raw points and events, the derived layer, the user's corrections and
+  /// names, Fog of World and the MetricKit reports. The raw layer's delete guard is lifted for this
+  /// one transaction only (P5's single exception). Rows are deleted in one transaction instead of
+  /// replacing the file, so the recording engine's writer and every observation keep their
+  /// connections and recording goes on into the empty tables (D55 ③). IDs are never reused
+  /// (AUTOINCREMENT), so a place lookup that started before writes nowhere, and a processing run
+  /// that started before is refused (`replaceOpenSegments(madeFrom:…)`). VACUUM and a checkpoint
+  /// then rewrite the files without the freed pages.
+  func deleteAllData() async throws {
+    try await pool.write { db in
+      let tables = try String.fetchAll(
+        db, sql: "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != 'grdb_migrations'")
+      for table in Self.rawTables { try db.execute(sql: "DROP TRIGGER \(table)_no_delete") }
+      for table in tables { try db.execute(sql: "DELETE FROM \(table.quotedDatabaseIdentifier)") }
+      for table in Self.rawTables { try db.execute(sql: Self.appendOnlyTrigger(on: table, refusing: "DELETE")) }
+    }
+    try await pool.vacuum()
+    do {
+      _ = try await pool.writeWithoutTransaction { db in try db.checkpoint(.truncate) }
+    } catch let error as DatabaseError where error.resultCode == .SQLITE_BUSY {
+      // A reader holds the log; SQLite's automatic checkpoints copy the vacuumed pages later.
+      AppLog.storage.notice("checkpoint after deleting all data deferred: a reader is busy")
+    }
+  }
+
+  /// What deleting all data removes (D55 ④): recorded days and distance as the statistics count
+  /// them, and whether Fog of World data is stored.
+  struct DataSummary: Equatable, Sendable {
+    var days: Int
+    var metres: Double
+    var hasFogOfWorld: Bool
+  }
+
+  func observeDataSummary() -> AsyncValueObservation<DataSummary> {
+    ValueObservation
+      .tracking { db in
+        let input = try Self.statisticsInput(db)
+        let statistics = TravelStatistics(input, year: nil)
+        let hasFog = try Bool.fetchOne(db, sql: "SELECT EXISTS (SELECT 1 FROM fog_import)") ?? false
+        return DataSummary(days: statistics.recordedDays, metres: statistics.distance, hasFogOfWorld: hasFog)
+      }
+      .removeDuplicates()
+      .values(in: pool)
+  }
+
+  // MARK: - Diagnostics (D55 ⑤)
+
+  /// Stores a MetricKit report and drops those older than `MetricReport.retention`.
+  func saveMetricReport(_ report: MetricReport) async throws {
+    try await pool.write { db in
+      var report = report
+      try report.insert(db)
+      try db.execute(
+        sql: "DELETE FROM metric_reports WHERE receivedAt < ?",
+        arguments: [RawPoint.milliseconds(report.receivedAt.addingTimeInterval(-MetricReport.retention))])
+    }
+  }
+
+  /// What the diagnostic report is made of, since `start`. Segments come with coordinates, which
+  /// the report leaves out (`DiagnosticReport`).
+  struct DiagnosticsInput: Sendable {
+    var events: [RecorderEvent]
+    var segments: [Segment]
+    var metricReports: [MetricReport]
+  }
+
+  func diagnosticsInput(since start: Date) async throws -> DiagnosticsInput {
+    let milliseconds = RawPoint.milliseconds(start)
+    return try await pool.read { db in
+      DiagnosticsInput(
+        events: try RecorderEvent
+          .filter(RecorderEvent.Columns.timestamp >= milliseconds)
+          .order(RecorderEvent.Columns.timestamp, RecorderEvent.Columns.id)
+          .fetchAll(db),
+        segments: try Segment
+          .filter(Segment.Columns.end >= milliseconds)
+          .order(Segment.Columns.start, Segment.Columns.id)
+          .fetchAll(db),
+        metricReports: try MetricReport
+          .filter(MetricReport.Columns.receivedAt >= milliseconds)
+          .order(MetricReport.Columns.receivedAt, MetricReport.Columns.id)
+          .fetchAll(db))
+    }
   }
 }

@@ -119,7 +119,8 @@
 - 视口查询（D44）：每个已完成的移动在 `track_bounds` 存一个 WGS-84 包围盒（×10⁷ 整数，迁移 v7 从 RenderCache 最细一档回填，随段一起删除）。总览只读与屏幕及四周各半屏相交的轨迹（跨 ±180° 时拆成两段经度），取当前缩放的那一档简化缓存。用普通整数列、暂不建索引：一年几千行，全表扫描足够；数据量大了再考虑 R*Tree 或网格索引
 - 结构迁移：用 GRDB 的 DatabaseMigrator，迁移按顺序注册，必须有测试
 - UI 刷新：用 GRDB 的 ValueObservation 监听"今天"的派生数据
-- "删除全部数据"（F10）：关闭连接 → 删除数据库文件 → 重建空库
+- "删除全部数据"（F10，D55 ②③）：在一个事务里清空除 `grdb_migrations` 外的所有表；原始层的只追加触发器在同一事务里先删后建（P5 唯一的例外）；之后 VACUUM 并截断 WAL（遇到 SQLITE_BUSY 记日志、留到下次检查点）。不关闭连接、不删文件：记录引擎和各个观察继续用原来的连接，删除后照常记录。ID 用 AUTOINCREMENT，不会复用
+- 处理器的过期写入：处理器先读输入、算完再写。写入时核对"最新的已完成段"仍是读入时那一段，不是就放弃这次结果、重新读（`replaceOpenSegments(madeFrom:)`），这样删除全部数据时正在跑的处理不会把旧段写回去
 
 ---
 
@@ -287,8 +288,8 @@ App
 | `MapRendering` | 显示坐标转换、轨迹几何（路径、圆角）；MKMapView 包装和轨迹画布目前在 `Features/Today` | Geo、Storage（RenderCache） |
 | `Features/Today`、`Features/Calendar`、`Features/SegmentDetail`、`Features/Settings`、`Features/Onboarding` | 各页面 | Storage、MapRendering |
 | `ImportExport` | GPX 解析与生成 | Storage、Processing |
-| `Entitlements` | 统一的功能开关（F11），MVP 中所有开关默认开启 | — |
-| `Diagnostics` | 本地日志、MetricKit 接收、诊断日志导出（脱敏） | — |
+| `App/Entitlements` | 统一的功能开关（F11）：`Feature` 列表 + `isUnlocked`，MVP 中全部开启，界面上不显示（D55 ⑦） | — |
+| `Diagnostics` | `AppLog`（os.Logger）、`AppLogReader`（OSLogStore 读本进程的 error / fault）、`MetricReceiver`（MetricKit 报告存进 `metric_reports`，保留 30 天）、`DiagnosticReport`（纯函数生成文本，不含坐标和地名，D55 ⑤） | Storage |
 | `TraceNotesWidgets`（扩展） | Control Widget + App Intent | App Group 共享状态 |
 
 规则：
@@ -347,5 +348,5 @@ App
 | VS8 | GPX 导入 / 导出（D53） | — |
 | VS8.5 | 世界迷雾导入（D54） | — |
 | VS9 | 控制中心暂停 / 恢复（正式） | S1 |
-| VS10 | 设置、删除全部数据、诊断日志、功能开关 | — |
+| VS10 | 设置、删除全部数据、诊断日志、功能开关（D55） | — |
 | VS11 | Liquid Glass 打磨、浅色/深色、三语文案 | — |

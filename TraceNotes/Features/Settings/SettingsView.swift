@@ -9,11 +9,13 @@ nonisolated extension UTType {
   static let gpx = UTType(importedAs: "com.topografix.gpx", conformingTo: .xml)
 }
 
-/// The minimal settings screen (F10 skeleton, D53 ①): the appearance (D40), GPX export and
-/// import (F9) and the Fog of World import (F12, D54). A .gpx file opened from Files or the share sheet arrives as `openedFile` and is
-/// imported here, so its result shows in the same place.
+/// The settings screen (F10, D53 ①, D55 ①): the appearance (D40), GPX export and import (F9),
+/// the Fog of World import (F12, D54), the diagnostic report, about, and deleting all data. A .gpx
+/// file opened from Files or the share sheet arrives as `openedFile` and is imported here, so its
+/// result shows in the same place.
 struct SettingsView: View {
   let database: AppDatabase
+  let engine: RecordingEngine
   /// The day on screen, the export's default range.
   let day: LocalDay
   @Binding var openedFile: URL?
@@ -25,6 +27,20 @@ struct SettingsView: View {
   @State private var fogOfWorld: AppDatabase.FogOfWorldSummary?
   @State private var fogState = FogState.idle
   @State private var confirmsFogRemoval = false
+  @State private var dataSummary: AppDatabase.DataSummary?
+  @State private var deletion = DeleteState.idle
+  /// The first and second confirmation of deleting all data (D55 ④).
+  @State private var confirmsDeletion = false
+  @State private var confirmsDeletionAgain = false
+  /// Opened from the first confirmation, to export everything before deleting it.
+  @State private var exportsAllFirst = false
+
+  enum DeleteState: Equatable {
+    case idle
+    case deleting
+    case deleted
+    case failed(String)
+  }
 
   enum FileKind {
     case gpx
@@ -80,6 +96,32 @@ struct SettingsView: View {
           Text("Imported points appear only where Trace Notes has no recording of its own.")
         }
         fogOfWorldSection
+        Section {
+          NavigationLink {
+            DiagnosticReportView(database: database, engine: engine)
+          } label: {
+            Label { Text("Diagnostic Report") } icon: { Image(systemName: "stethoscope") }
+          }
+        } header: {
+          Text("Diagnostics")
+        } footer: {
+          Text("For reporting a problem: you see the whole report before sharing it. It has no coordinates or place names.")
+        }
+        Section {
+          LabeledContent {
+            Text(verbatim: Self.version)
+          } label: {
+            Text("Version")
+          }
+          NavigationLink { PrivacyPolicyView() } label: { Text("Privacy Policy") }
+          NavigationLink { LicensesView() } label: { Text("Open-Source Licenses") }
+        } header: {
+          Text("About")
+        }
+        deletionSection
+      }
+      .navigationDestination(isPresented: $exportsAllFirst) {
+        GPXExportView(database: database, day: day, selectsAllRecords: true)
       }
       .navigationTitle(Text("Settings"))
       .navigationBarTitleDisplayMode(.inline)
@@ -114,6 +156,31 @@ struct SettingsView: View {
       }
     } message: {
       Text("Only the explored areas you imported are removed. Your own records stay.")
+    }
+    .confirmationDialog(Text("Delete all data?"), isPresented: $confirmsDeletion, titleVisibility: .visible) {
+      Button { exportsAllFirst = true } label: { Text("Export GPX First") }
+      Button(role: .destructive) { confirmsDeletionAgain = true } label: { Text("Delete All Data") }
+    } message: {
+      deletionMessage
+    }
+    .alert(Text("This can’t be undone."), isPresented: $confirmsDeletionAgain) {
+      Button(role: .destructive) {
+        Task { await deleteAllData() }
+      } label: {
+        Text("Delete")
+      }
+    } message: {
+      Text("All records are deleted from this iPhone. Recording goes on from now.")
+    }
+    .task {
+      do {
+        for try await summary in database.observeDataSummary() { dataSummary = summary }
+      } catch is CancellationError {
+        // The settings closed.
+      } catch {
+        AppLog.storage.error("reading the data summary failed: \(error.localizedDescription, privacy: .public)")
+        deletion = .failed(error.localizedDescription)
+      }
     }
     .task {
       do {
@@ -235,6 +302,68 @@ struct SettingsView: View {
     }
   }
 
+  /// D55 ①②: last, on its own, in red.
+  @ViewBuilder private var deletionSection: some View {
+    Section {
+      Button(role: .destructive) {
+        confirmsDeletion = true
+      } label: {
+        Label { Text("Delete All Data") } icon: { Image(systemName: "trash").foregroundStyle(.red) }
+      }
+      .disabled(deletion == .deleting || dataSummary == nil)
+      switch deletion {
+      case .idle:
+        EmptyView()
+      case .deleting:
+        HStack(spacing: 8) {
+          ProgressView()
+          Text("Deleting…")
+        }
+        .foregroundStyle(.secondary)
+      case .deleted:
+        Label { Text("All data was deleted.") } icon: { Image(systemName: "checkmark.circle.fill") }
+          .font(.footnote)
+          .foregroundStyle(.green)
+      case .failed(let message):
+        Label { Text(verbatim: message) } icon: { Image(systemName: "exclamationmark.triangle.fill") }
+          .font(.footnote)
+          .foregroundStyle(.orange)
+      }
+    } footer: {
+      Text("Deletes every record, your changes to them and the Fog of World data. Your settings stay.")
+    }
+  }
+
+  /// What the first confirmation says will go (D55 ④).
+  private var deletionMessage: Text {
+    let summary = dataSummary ?? AppDatabase.DataSummary(days: 0, metres: 0, hasFogOfWorld: false)
+    let distance = Measurement(value: summary.metres, unit: UnitLength.meters)
+      .formatted(.measurement(width: .abbreviated, usage: .road))
+    return summary.hasFogOfWorld
+      ? Text("This deletes \(summary.days) days and about \(distance) of records, and the Fog of World data. You can export GPX first.")
+      : Text("This deletes \(summary.days) days and about \(distance) of records. You can export GPX first.")
+  }
+
+  private func deleteAllData() async {
+    deletion = .deleting
+    do {
+      try await database.deleteAllData()
+      AppLog.storage.notice("all data deleted")
+      deletion = .deleted
+    } catch {
+      AppLog.storage.error("deleting all data failed: \(error.localizedDescription, privacy: .public)")
+      deletion = .failed(error.localizedDescription)
+    }
+  }
+
+  /// "1.0 (12)".
+  private static var version: String {
+    let info = Bundle.main.infoDictionary
+    let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+    let build = info?["CFBundleVersion"] as? String ?? "?"
+    return "\(version) (\(build))"
+  }
+
   private func removeInboxCopy(_ url: URL) {
     do {
       try FileManager.default.removeItem(at: url)
@@ -330,8 +459,12 @@ struct GPXExportView: View {
   @State private var pointCount: Int?
   @State private var failure: String?
 
-  init(database: AppDatabase, day: LocalDay) {
+  /// Pick all recorded days once they are known, instead of `day` (export before deleting, D55 ④).
+  private let selectsAllRecords: Bool
+
+  init(database: AppDatabase, day: LocalDay, selectsAllRecords: Bool = false) {
     self.database = database
+    self.selectsAllRecords = selectsAllRecords
     let date = Self.date(of: day)
     _from = State(initialValue: date)
     _through = State(initialValue: date)
@@ -385,6 +518,10 @@ struct GPXExportView: View {
     .task {
       do {
         recordedDays = try await database.pointDays()
+        if selectsAllRecords, let recordedDays {
+          from = Self.date(of: recordedDays.lowerBound)
+          through = Self.date(of: recordedDays.upperBound)
+        }
       } catch {
         AppLog.storage.error("reading the recorded days failed: \(error.localizedDescription, privacy: .public)")
         failure = error.localizedDescription

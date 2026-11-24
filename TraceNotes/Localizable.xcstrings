@@ -261,6 +261,22 @@
         }
       }
     },
+    "About": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このアプリについて"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关于"
+          }
+        }
+      }
+    },
     "All Records": {
       "localizations": {
         "en": {
@@ -295,6 +311,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "全部"
+          }
+        }
+      }
+    },
+    "All data was deleted.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "すべてのデータを削除しました。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已删除全部数据。"
+          }
+        }
+      }
+    },
+    "All records are deleted from this iPhone. Recording goes on from now.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この iPhone からすべての記録が削除されます。記録はこのあとも続きます。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这台 iPhone 上的所有记录都会被删除，之后会照常继续记录。"
           }
         }
       }
@@ -507,6 +555,118 @@
         }
       }
     },
+    "Delete": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "削除"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除"
+          }
+        }
+      }
+    },
+    "Delete All Data": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "すべてのデータを削除"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除全部数据"
+          }
+        }
+      }
+    },
+    "Delete all data?": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "すべてのデータを削除しますか？"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除全部数据？"
+          }
+        }
+      }
+    },
+    "Deletes every record, your changes to them and the Fog of World data. Your settings stay.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "すべての記録、記録に加えた変更、世界の霧のデータを削除します。設定はそのまま残ります。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除所有记录、你对记录做的修改以及世界迷雾的数据。设置会保留。"
+          }
+        }
+      }
+    },
+    "Deleting…": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "削除中…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在删除…"
+          }
+        }
+      }
+    },
+    "Diagnostic Report": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "診断レポート"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "诊断报告"
+          }
+        }
+      }
+    },
+    "Diagnostics": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "診断"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "诊断"
+          }
+        }
+      }
+    },
     "Distance": {
       "localizations": {
         "ja": {
@@ -583,6 +743,22 @@
         }
       }
     },
+    "Every point Trace Notes records, and everything made from it, is stored only on this iPhone. Delete All Data in Settings removes it.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trace Notes が記録したすべての地点と、そこから作られたデータは、この iPhone にだけ保存されます。設定の「すべてのデータを削除」で消去できます。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trace Notes 记录的每一个点，以及由它们生成的所有内容，都只保存在这台 iPhone 上。可以在设置里用“删除全部数据”清除。"
+          }
+        }
+      }
+    },
     "Export GPX": {
       "localizations": {
         "en": {
@@ -601,6 +777,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "导出 GPX"
+          }
+        }
+      }
+    },
+    "Export GPX First": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先に GPX を書き出す"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先导出 GPX"
           }
         }
       }
@@ -637,6 +829,22 @@
         }
       }
     },
+    "For reporting a problem: you see the whole report before sharing it. It has no coordinates or place names.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "問題を報告するときに使います。共有する前にレポート全体を確認できます。座標や地名は含まれません。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用于反馈问题：分享前可以先看完整份报告。报告里不含坐标和地名。"
+          }
+        }
+      }
+    },
     "From": {
       "localizations": {
         "en": {
@@ -655,6 +863,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "开始日期"
+          }
+        }
+      }
+    },
+    "GPX files and diagnostic reports are made only when you export or share them, and go only where you send them. Diagnostic reports have no coordinates or place names.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GPX ファイルと診断レポートは、あなたが書き出しや共有をしたときにだけ作られ、送り先もあなたが選んだところだけです。診断レポートには座標や地名は含まれません。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GPX 文件和诊断报告只在你导出或分享时才生成，也只会发到你选择的地方。诊断报告里不含坐标和地名。"
           }
         }
       }
@@ -1161,6 +1385,22 @@
         }
       }
     },
+    "No coordinates or place names are included.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "座標や地名は含まれていません。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不含任何坐标和地名。"
+          }
+        }
+      }
+    },
     "No record": {
       "localizations": {
         "en": {
@@ -1419,6 +1659,22 @@
         }
       }
     },
+    "Open-Source Licenses": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オープンソースライセンス"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开源许可"
+          }
+        }
+      }
+    },
     "Opens the calendar": {
       "localizations": {
         "en": {
@@ -1529,6 +1785,22 @@
         }
       }
     },
+    "Place names come from Apple Maps.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "地名は Apple のマップから取得します。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "地名来自 Apple 地图。"
+          }
+        }
+      }
+    },
     "Plane": {
       "localizations": {
         "en": {
@@ -1569,6 +1841,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "前一天"
+          }
+        }
+      }
+    },
+    "Privacy Policy": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "プライバシーポリシー"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐私政策"
           }
         }
       }
@@ -1765,6 +2053,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "设置"
+          }
+        }
+      }
+    },
+    "Share": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "共有"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分享"
           }
         }
       }
@@ -2021,6 +2325,22 @@
         }
       }
     },
+    "The report couldn’t be made": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "レポートを作成できませんでした"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法生成报告"
+          }
+        }
+      }
+    },
     "The timeline can’t be updated: %@": {
       "localizations": {
         "en": {
@@ -2065,6 +2385,22 @@
         }
       }
     },
+    "There is no account, no analytics, no advertising and no third-party code that sends anything anywhere.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アカウントも、利用状況の分析も、広告もありません。どこかへ情報を送信するサードパーティのコードも含まれていません。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有账号、没有统计分析、没有广告，也没有任何会把数据发往别处的第三方代码。"
+          }
+        }
+      }
+    },
     "This GPX file has no tracks or routes.": {
       "localizations": {
         "en": {
@@ -2083,6 +2419,90 @@
           "stringUnit": {
             "state": "translated",
             "value": "这个 GPX 文件里没有轨迹或路线。"
+          }
+        }
+      }
+    },
+    "This can’t be undone.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この操作は取り消せません。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除后无法恢复。"
+          }
+        }
+      }
+    },
+    "This deletes %lld days and about %@ of records, and the Fog of World data. You can export GPX first.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This deletes %lld day and about %@ of records, and the Fog of World data. You can export GPX first."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This deletes %lld days and about %@ of records, and the Fog of World data. You can export GPX first."
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 日分・約 %@ の記録と、世界の霧のデータを削除します。先に GPX を書き出しておくこともできます。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将删除 %lld 天、约 %@ 的记录，以及世界迷雾的数据。可以先导出 GPX。"
+          }
+        }
+      }
+    },
+    "This deletes %lld days and about %@ of records. You can export GPX first.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This deletes %lld day and about %@ of records. You can export GPX first."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This deletes %lld days and about %@ of records. You can export GPX first."
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 日分・約 %@ の記録を削除します。先に GPX を書き出しておくこともできます。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将删除 %lld 天、约 %@ 的记录。可以先导出 GPX。"
           }
         }
       }
@@ -2169,6 +2589,22 @@
         }
       }
     },
+    "To name the places where you stay, Trace Notes asks Apple’s map service for the address at that position. Apple handles these requests under its own privacy policy; they are not linked to you by Trace Notes.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "滞在した場所に名前を付けるため、Trace Notes はその位置の住所を Apple のマップサービスに問い合わせます。この問い合わせは Apple のプライバシーポリシーに従って扱われ、Trace Notes があなたと結び付けることはありません。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "为了给你停留的地方起名字，Trace Notes 会向 Apple 地图服务查询那个位置的地址。这些查询按 Apple 自己的隐私政策处理，Trace Notes 不会把它们和你关联起来。"
+          }
+        }
+      }
+    },
     "Today": {
       "localizations": {
         "en": {
@@ -2209,6 +2645,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trace Notes 无法打开数据"
+          }
+        }
+      }
+    },
+    "Trace Notes collects no data.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trace Notes はデータを一切収集しません。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trace Notes 不收集任何数据。"
           }
         }
       }
@@ -2323,6 +2775,22 @@
         }
       }
     },
+    "Version": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "バージョン"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "版本"
+          }
+        }
+      }
+    },
     "Waiting for location access": {
       "localizations": {
         "en": {
@@ -2399,6 +2867,22 @@
         }
       }
     },
+    "You decide what leaves the app.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリの外に出るものは、あなたが決めます。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "什么内容离开 App，由你决定。"
+          }
+        }
+      }
+    },
     "Your footprints, kept as a diary": {
       "localizations": {
         "en": {
@@ -2417,6 +2901,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "把足迹写成日记"
+          }
+        }
+      }
+    },
+    "Your locations stay on this iPhone.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "位置情報はこの iPhone の中だけにあります。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "位置只存在这台 iPhone 上。"
           }
         }
       }

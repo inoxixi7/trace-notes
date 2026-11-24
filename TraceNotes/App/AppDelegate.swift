@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
   }
 
   let startup: Startup
+  private var metricReceiver: MetricReceiver?
 
   override init() {
     do {
@@ -28,7 +29,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
-    guard case .ready(_, let engine) = startup else { return true }
+    guard case .ready(let database, let engine) = startup else { return true }
+    let metricReceiver = MetricReceiver(database: database)
+    metricReceiver.start()
+    self.metricReceiver = metricReceiver
     engine.handleLaunch()
     #if DEBUG
     SpikeEngineGuard.start(engine: engine)
