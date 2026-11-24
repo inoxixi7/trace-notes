@@ -39,6 +39,8 @@ final class RecordingEngine: NSObject, CLLocationManagerDelegate {
   @ObservationIgnored private var launchClassified = false
   @ObservationIgnored private var motionUpdatesStarted = false
   @ObservationIgnored private var isLowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
+  /// The battery sample written last by this process (D56); nil until the first one.
+  @ObservationIgnored private var lastBattery: BatterySample?
   @ObservationIgnored private let writes: AsyncStream<Write>.Continuation
   /// Fixes the heartbeat skipped during the current stay, newest last, at most one heartbeat
   /// interval old: the way out of the place is saved from them when the stay ends (D38).
@@ -71,6 +73,7 @@ final class RecordingEngine: NSObject, CLLocationManagerDelegate {
     manager.delegate = self
     startWriter(stream)
     observeLowPowerMode()
+    observeBattery()
   }
 
   // MARK: - Lifecycle
@@ -239,6 +242,9 @@ final class RecordingEngine: NSObject, CLLocationManagerDelegate {
 
   func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
     locations.forEach(handle)
+    // Battery notifications are not promised while in the background; every delivery is a
+    // chance to notice a change too (D56).
+    batteryChanged()
   }
 
   func locationManager(_ manager: CLLocationManager, didVisit visit: CLVisit) {
@@ -386,6 +392,41 @@ final class RecordingEngine: NSObject, CLLocationManagerDelegate {
     guard enabled != isLowPowerMode else { return }
     isLowPowerMode = enabled
     enqueue(enabled ? .lowPowerModeOn : .lowPowerModeOff, at: .now)
+  }
+
+  // MARK: - Battery (D56)
+
+  private struct BatterySample: Equatable {
+    var percent: Int
+    var power: String
+  }
+
+  private func observeBattery() {
+    UIDevice.current.isBatteryMonitoringEnabled = true
+    Task { [weak self] in
+      for await _ in NotificationCenter.default.notifications(named: UIDevice.batteryLevelDidChangeNotification) {
+        self?.batteryChanged()
+      }
+    }
+    Task { [weak self] in
+      for await _ in NotificationCenter.default.notifications(named: UIDevice.batteryStateDidChangeNotification) {
+        self?.batteryChanged()
+      }
+    }
+    batteryChanged()
+  }
+
+  /// Writes a `battery` event when the level (in whole percent) or the power state changed.
+  private func batteryChanged() {
+    let device = UIDevice.current
+    // -1 and `.unknown`: monitoring is off or there is no battery (the simulator).
+    guard device.batteryLevel >= 0, device.batteryState != .unknown else { return }
+    let sample = BatterySample(
+      percent: Int((device.batteryLevel * 100).rounded()),
+      power: device.batteryState == .unplugged ? "unplugged" : device.batteryState == .full ? "full" : "charging")
+    guard sample != lastBattery else { return }
+    lastBattery = sample
+    enqueue(.battery, payload: "level=\(sample.percent) power=\(sample.power) engine=\(core.state.name)", at: .now)
   }
 
   // MARK: - Writing

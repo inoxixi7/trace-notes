@@ -289,7 +289,7 @@ App
 | `Features/Today`、`Features/Calendar`、`Features/SegmentDetail`、`Features/Settings`、`Features/Onboarding` | 各页面 | Storage、MapRendering |
 | `ImportExport` | GPX 解析与生成 | Storage、Processing |
 | `App/Entitlements` | 统一的功能开关（F11）：`Feature` 列表 + `isUnlocked`，MVP 中全部开启，界面上不显示（D55 ⑦） | — |
-| `Diagnostics` | `AppLog`（os.Logger）、`AppLogReader`（OSLogStore 读本进程的 error / fault）、`MetricReceiver`（MetricKit 报告存进 `metric_reports`，保留 30 天）、`DiagnosticReport`（纯函数生成文本，不含坐标和地名，D55 ⑤） | Storage |
+| `Diagnostics` | `AppLog`（os.Logger）、`AppLogReader`（OSLogStore 读本进程的 error / fault）、`MetricReceiver`（MetricKit 报告存进 `metric_reports`，保留 30 天）、`DiagnosticReport`（纯函数生成文本，不含坐标和地名，D55 ⑤；含按天、按静止 / 移动的掉电表，数据来自记录引擎写的 `battery` 事件，D56） | Storage |
 | `TraceNotesWidgets`（扩展） | Control Widget + App Intent | App Group 共享状态 |
 
 规则：

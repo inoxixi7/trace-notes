@@ -26,6 +26,9 @@ nonisolated struct RecorderEvent: Equatable, Sendable {
     case visitDepart
     /// Hourly count of points the stationary heartbeat did not save (D28).
     case heartbeatSkipped
+    /// The whole phone's battery level or power state changed (D56), e.g.
+    /// `level=63 power=unplugged engine=stationary`. For the diagnostic report's drain table.
+    case battery
   }
 }
 

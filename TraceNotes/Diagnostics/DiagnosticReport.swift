@@ -36,7 +36,8 @@ nonisolated enum DiagnosticReport {
   }
 
   static func text(
-    device: Device, status: Status, input: AppDatabase.DiagnosticsInput, logs: [LogLine], now: Date
+    device: Device, status: Status, input: AppDatabase.DiagnosticsInput, logs: [LogLine], now: Date,
+    timeZone: TimeZone = .current
   ) -> String {
     var lines = [
       "Trace Notes diagnostic report",
@@ -63,6 +64,8 @@ nonisolated enum DiagnosticReport {
     for day in days.keys.sorted() {
       lines.append(summary(of: day, days[day] ?? []))
     }
+
+    lines += ["", "## Battery (whole phone, D56)"] + batteryLines(input.events, timeZone: timeZone)
 
     lines += ["", "## Recorder events (last 30 days)"]
     lines += input.events.map { event in
@@ -97,6 +100,74 @@ nonisolated enum DiagnosticReport {
       gaps.isEmpty ? "0" : "\(gaps.count) (\(reasonList))",
       zones,
     ].joined(separator: " | ")
+  }
+
+  /// One sample read from a `battery` event's payload.
+  private struct BatterySample {
+    var date: Date
+    var percent: Int
+    var unplugged: Bool
+    var moving: Bool
+  }
+
+  /// The battery's drop per day on battery power, split by what the recorder was doing.
+  ///
+  /// Each pair of neighbouring samples is one interval, filed under the day and the recorder
+  /// state of its first sample. An interval counts only when the phone was on battery at both
+  /// ends and the level did not rise; any other one (charging, or a charge missed between two
+  /// samples) is left out. The level is the whole phone's, so screen use shows here too: hours
+  /// with the phone untouched (nights) come closest to Trace Notes' own cost.
+  static func batteryLines(_ events: [RecorderEvent], timeZone: TimeZone) -> [String] {
+    let samples = events.compactMap(batterySample)
+    guard samples.count >= 2 else { return ["No battery samples yet."] }
+    struct Totals {
+      var stillSeconds = 0.0, stillDrop = 0
+      var movingSeconds = 0.0, movingDrop = 0
+    }
+    var days: [LocalDay: Totals] = [:]
+    for (start, end) in zip(samples, samples.dropFirst()) where start.unplugged && end.unplugged && end.percent <= start.percent {
+      let seconds = end.date.timeIntervalSince(start.date)
+      let drop = start.percent - end.percent
+      let day = LocalDay(start.date, in: timeZone)
+      if start.moving {
+        days[day, default: Totals()].movingSeconds += seconds
+        days[day, default: Totals()].movingDrop += drop
+      } else {
+        days[day, default: Totals()].stillSeconds += seconds
+        days[day, default: Totals()].stillDrop += drop
+      }
+    }
+    var lines = ["day | drop on battery | still: hours, drop, per hour | moving: hours, drop, per hour"]
+    for day in days.keys.sorted() {
+      let totals = days[day] ?? Totals()
+      lines.append([
+        "\(day)",
+        "\(totals.stillDrop + totals.movingDrop) %",
+        rate(seconds: totals.stillSeconds, drop: totals.stillDrop),
+        rate(seconds: totals.movingSeconds, drop: totals.movingDrop),
+      ].joined(separator: " | "))
+    }
+    return lines
+  }
+
+  private static func batterySample(_ event: RecorderEvent) -> BatterySample? {
+    guard event.kind == .battery, let payload = event.payload else { return nil }
+    var fields: [Substring: Substring] = [:]
+    for pair in payload.split(separator: " ") {
+      let parts = pair.split(separator: "=", maxSplits: 1)
+      if parts.count == 2 { fields[parts[0]] = parts[1] }
+    }
+    guard let level = fields["level"].flatMap({ Int($0) }), let power = fields["power"], let engine = fields["engine"] else {
+      return nil
+    }
+    return BatterySample(date: event.timestamp, percent: level, unplugged: power == "unplugged", moving: engine.hasPrefix("moving"))
+  }
+
+  private static func rate(seconds: Double, drop: Int) -> String {
+    let hours = seconds / 3600
+    guard hours > 0 else { return "-" }
+    // Not localized: the report reads the same in every language.
+    return String(format: "%.1f h, %d %%, %.2f %%/h", hours, drop, Double(drop) / hours)
   }
 
   private static func timestamp(_ date: Date) -> String {
