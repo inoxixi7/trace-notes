@@ -6,6 +6,8 @@ import SwiftUI
 struct StatisticsPanel: View {
   /// Nil until the first read.
   let input: TravelStatistics.Input?
+  /// Fog of World's estimated distance, when imported (D54 ⑤).
+  let fogOfWorldDistance: Double?
   /// Nil for all records.
   @Binding var year: Int?
   /// False while collapsed to the header, so nothing peeks out under it.
@@ -14,7 +16,7 @@ struct StatisticsPanel: View {
   let onHeaderHeight: (CGFloat) -> Void
 
   var body: some View {
-    let statistics = input.map { TravelStatistics($0, year: year) }
+    let statistics = input.map { TravelStatistics($0, year: year, fogOfWorld: fogOfWorldDistance) }
     VStack(spacing: 0) {
       header(statistics)
         .onGeometryChange(for: CGFloat.self) { proxy in
@@ -24,7 +26,7 @@ struct StatisticsPanel: View {
         }
       List {
         if let statistics {
-          if statistics.recordedDays == 0 {
+          if statistics.recordedDays == 0, statistics.fogOfWorldDistance == nil {
             Text("Statistics appear here once you’ve moved.")
               .foregroundStyle(.secondary)
           } else {
@@ -65,8 +67,16 @@ struct StatisticsPanel: View {
 
   @ViewBuilder private func content(_ statistics: TravelStatistics) -> some View {
     Section {
+      let longest = max(statistics.distanceByMode.first?.metres ?? 0, statistics.fogOfWorldDistance ?? 0)
       ForEach(statistics.distanceByMode, id: \.mode) { entry in
-        ModeDistanceRow(entry: entry, longest: statistics.distanceByMode.first?.metres ?? 0)
+        DistanceRow(
+          title: entry.mode.name, symbol: entry.mode.symbol, distance: Text(verbatim: Self.format(entry.metres)),
+          metres: entry.metres, longest: longest)
+      }
+      if let fog = statistics.fogOfWorldDistance {
+        DistanceRow(
+          title: Text("Fog of World (estimated)"), symbol: "cloud.fog",
+          distance: Text("about \(Self.format(fog))"), metres: fog, longest: longest)
       }
     } header: {
       SectionTitle(title: Text("Distance"), value: Text(verbatim: Self.format(statistics.distance)))
@@ -189,17 +199,20 @@ private struct SectionTitle: View {
   }
 }
 
-/// A mode's icon, name and distance, with a bar against the longest mode.
-private struct ModeDistanceRow: View {
-  let entry: TravelStatistics.ModeDistance
+/// A mode's (or Fog of World's) icon, name and distance, with a bar against the longest.
+private struct DistanceRow: View {
+  let title: Text
+  let symbol: String
+  let distance: Text
+  let metres: Double
   let longest: Double
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
       HStack {
-        Label { entry.mode.name } icon: { Image(systemName: entry.mode.symbol) }
+        Label { title } icon: { Image(systemName: symbol) }
         Spacer()
-        Text(verbatim: StatisticsPanel.format(entry.metres))
+        distance
           .monospacedDigit()
           .foregroundStyle(.secondary)
       }
@@ -210,7 +223,7 @@ private struct ModeDistanceRow: View {
           GeometryReader { proxy in
             Capsule()
               .fill(.tint)
-              .frame(width: longest > 0 ? max(Self.barHeight, proxy.size.width * entry.metres / longest) : 0)
+              .frame(width: longest > 0 ? max(Self.barHeight, proxy.size.width * metres / longest) : 0)
           }
         }
     }

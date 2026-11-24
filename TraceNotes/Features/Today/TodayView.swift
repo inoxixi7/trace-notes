@@ -15,6 +15,10 @@ struct TodayView: View {
   @State private var today = LocalDay(.now, in: .current)
   @State private var recordedDays: Set<LocalDay> = []
   @State private var showsCalendar = false
+  /// The settings screen (D53 ①), presented from the panel like the calendar.
+  @State private var showsSettings = false
+  /// A .gpx file opened from Files or the share sheet, imported by the settings screen (F9).
+  @State private var openedGPX: URL?
   /// When the app last left the screen, to come back to today after a long absence (D43).
   @State private var backgroundedAt: Date?
   @State private var points: [RawPoint] = []
@@ -41,6 +45,15 @@ struct TodayView: View {
   /// The statistics' source while the overview is on, and the year they cover (nil: all, D50).
   @State private var statisticsInput: TravelStatistics.Input?
   @State private var statisticsYear: Int?
+  /// Fog of World's imported layer while the overview is on (D54): whether there is one, the
+  /// cells read for the newest viewport, and its estimated distance.
+  @State private var fogOfWorld: AppDatabase.FogOfWorldSummary?
+  /// Set once the layer's summary has been read, so the overview is framed with it (or without).
+  @State private var hasLoadedFogOfWorld = false
+  @State private var fogLines: (request: OverviewRequest, lines: [[FogOfWorld.LinePoint]])?
+  @State private var fogDistance: Double?
+  /// The overview's show / hide switch for Fog of World (D54 ⑧), kept across launches.
+  @AppStorage("showsFogOfWorld") private var showsFogOfWorld = true
   #if DEBUG
   @State private var showsDeveloperMenu = false
   #endif
@@ -101,6 +114,9 @@ struct TodayView: View {
     // One panel throughout: the day's timeline, or the statistics in the overview (D48 ④, D50).
     .sheet(isPresented: .constant(true)) {
       panelContent
+        .sheet(isPresented: $showsSettings) {
+          SettingsView(database: database, day: day, openedFile: $openedGPX)
+        }
         .presentationDetents([collapsedDetent, Self.half, .large], selection: panelDetent)
         .presentationBackgroundInteraction(.enabled(upThrough: Self.half))
         .presentationContentInteraction(.scrolls)
@@ -112,6 +128,10 @@ struct TodayView: View {
         } action: { top in
           panelTop = top
         }
+    }
+    .onOpenURL { url in
+      openedGPX = url
+      showsSettings = true
     }
     .task(id: day) {
       await observe(day)
@@ -138,17 +158,29 @@ struct TodayView: View {
     .task(id: showsStatusBubble) {
       await closeStatusBubbleLater()
     }
+    .task(id: OverviewBoundsKey(isOn: showsOverview && hasLoadedFogOfWorld, includesFog: drawsFogOfWorld)) {
+      guard showsOverview, hasLoadedFogOfWorld else { return }
+      await observeOverviewBounds()
+    }
     .task(id: showsOverview) {
       guard showsOverview else { return }
-      await observeOverviewBounds()
+      await observeFogOfWorld()
     }
     .task(id: showsOverview) {
       guard showsOverview else { return }
       await observeStatistics()
     }
+    .task(id: showsOverview) {
+      guard showsOverview else { return }
+      await observeFogDistance()
+    }
     .task(id: overviewRequest) {
       guard showsOverview, let overviewRequest else { return }
       await observeOverviewTracks(for: overviewRequest)
+    }
+    .task(id: overviewRequest) {
+      guard showsOverview, let overviewRequest, overviewRequest.fogShift != nil else { return }
+      await observeFogLines(for: overviewRequest)
     }
     .onChange(of: showsOverview) {
       // Cleared on closing, so the next opening starts from nothing (the map asks again).
@@ -158,6 +190,10 @@ struct TodayView: View {
       overviewRequest = nil
       overviewTracks = nil
       statisticsInput = nil
+      fogOfWorld = nil
+      hasLoadedFogOfWorld = false
+      fogLines = nil
+      fogDistance = nil
     }
     .onChange(of: scenePhase) { _, phase in
       switch phase {
@@ -186,9 +222,17 @@ struct TodayView: View {
     }
     let status = RecordingStatus(engine: engine)
     return HStack(alignment: .bottom) {
-      OverviewButton(isOn: $showsOverview)
+      VStack(spacing: Self.controlsSpacing) {
+        if showsOverview, fogOfWorld != nil {
+          FogOfWorldButton(isOn: $showsFogOfWorld)
+            .transition(.scale.combined(with: .opacity))
+        }
+        OverviewButton(isOn: $showsOverview)
+      }
       Spacer()
-      MapControls(status: status, motionDenied: RecordingStatus.motionDenied(engine), showsStatus: $showsStatusBubble)
+      MapControls(
+        status: status, motionDenied: RecordingStatus.motionDenied(engine), showsStatus: $showsStatusBubble,
+        onOpenSettings: { showsSettings = true })
     }
     .padding(.horizontal)
     .padding(.bottom, lift + Self.controlsSpacing)
@@ -217,12 +261,65 @@ struct TodayView: View {
   private var overview: TodayMapView.Overview? {
     guard showsOverview else { return nil }
     return TodayMapView.Overview(
-      bounds: overviewBounds, request: overviewTracks?.request, tracks: overviewTracks?.tracks ?? [:])
+      bounds: overviewBounds, request: overviewTracks?.request, tracks: overviewTracks?.tracks ?? [:],
+      showsFogOfWorld: drawsFogOfWorld, fogRequest: fogLines?.request, fogLines: fogLines?.lines ?? [])
+  }
+
+  /// Fog of World is drawn when there is an import and the switch is on (D54 ⑧).
+  private var drawsFogOfWorld: Bool {
+    showsFogOfWorld && fogOfWorld != nil
+  }
+
+  private struct OverviewBoundsKey: Equatable {
+    var isOn: Bool
+    var includesFog: Bool
+  }
+
+  private func observeFogOfWorld() async {
+    do {
+      for try await summary in database.observeFogOfWorld() {
+        fogOfWorld = summary
+        hasLoadedFogOfWorld = true
+      }
+    } catch is CancellationError {
+      // The overview was closed.
+    } catch {
+      AppLog.storage.error("reading the Fog of World layer failed: \(error.localizedDescription, privacy: .public)")
+      processingError = error.localizedDescription
+    }
+  }
+
+  private func observeFogLines(for request: OverviewRequest) async {
+    guard let shift = request.fogShift else { return }
+    do {
+      for try await lines in database.observeFogOfWorldLines(in: request.box, shift: shift) {
+        fogLines = (request, lines)
+      }
+    } catch is CancellationError {
+      // A newer viewport, or the overview was closed.
+    } catch {
+      AppLog.storage.error("reading the Fog of World layer failed: \(error.localizedDescription, privacy: .public)")
+      processingError = error.localizedDescription
+    }
+  }
+
+  /// D54 ⑤: counted in the statistics whether or not the layer is drawn.
+  private func observeFogDistance() async {
+    do {
+      for try await distance in database.observeFogOfWorldDistance(tolerance: Segmenter.Parameters().dwellRadius) {
+        fogDistance = distance
+      }
+    } catch is CancellationError {
+      // The overview closed.
+    } catch {
+      AppLog.storage.error("estimating the Fog of World distance failed: \(error.localizedDescription, privacy: .public)")
+      processingError = error.localizedDescription
+    }
   }
 
   private func observeOverviewBounds() async {
     do {
-      for try await bounds in database.observeOverviewBounds() {
+      for try await bounds in database.observeOverviewBounds(includingFogOfWorld: drawsFogOfWorld) {
         overviewBounds = bounds
         hasLoadedOverview = true
       }
@@ -263,7 +360,7 @@ struct TodayView: View {
   @ViewBuilder private var panelContent: some View {
     if showsOverview {
       StatisticsPanel(
-        input: statisticsInput, year: $statisticsYear, showsList: panelStop != .collapsed,
+        input: statisticsInput, fogOfWorldDistance: fogDistance, year: $statisticsYear, showsList: panelStop != .collapsed,
         onHeaderHeight: { panelHeaderHeight = $0 })
     } else {
       timelinePanel
@@ -507,6 +604,25 @@ private let mapControlSize: CGFloat = 48
 
 /// The round glass button at the bottom left that turns the overview on and off (D44, D47); tinted
 /// while it is on.
+/// Shows or hides Fog of World's explored areas in the overview (D54 ⑧); there only when an
+/// import exists.
+private struct FogOfWorldButton: View {
+  @Binding var isOn: Bool
+
+  var body: some View {
+    Button { isOn.toggle() } label: {
+      Image(systemName: isOn ? "cloud.fog.fill" : "cloud.fog")
+        .font(.title3.weight(.semibold))
+        .foregroundStyle(isOn ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+        .frame(width: mapControlSize, height: mapControlSize)
+        .glassEffect(isOn ? .regular.tint(.accentColor).interactive() : .regular.interactive(), in: .circle)
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(Text("Fog of World"))
+    .accessibilityValue(isOn ? Text("Shown") : Text("Hidden"))
+  }
+}
+
 private struct OverviewButton: View {
   @Binding var isOn: Bool
 
@@ -531,6 +647,7 @@ private struct MapControls: View {
   let status: RecordingStatus
   let motionDenied: Bool
   @Binding var showsStatus: Bool
+  let onOpenSettings: () -> Void
 
   /// The widest the status capsule grows, so a long note wraps.
   private static let statusMaximumWidth: CGFloat = 250
@@ -558,7 +675,7 @@ private struct MapControls: View {
           .accessibilityHint(showsStatus ? Text("Hides the recording status") : Text("Shows the recording status"))
           Divider()
             .frame(width: Self.dividerWidth)
-          SettingsButton(size: mapControlSize)
+          SettingsButton(size: mapControlSize, action: onOpenSettings)
         }
         .glassEffect(.regular.interactive(), in: .capsule)
       }

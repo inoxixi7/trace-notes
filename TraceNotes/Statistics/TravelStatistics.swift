@@ -27,8 +27,11 @@ nonisolated struct TravelStatistics: Equatable, Sendable {
     var metres: Double
   }
 
-  /// Metres moved, plus the straight line across gaps travelled by a mode (D50 ④).
+  /// Metres moved, plus the straight line across gaps travelled by a mode (D50 ④), plus Fog of
+  /// World's estimate for all records (D54 ⑤).
   var distance: Double
+  /// Fog of World's estimated distance (D54 ⑤): counted for all records only, as it has no times.
+  var fogOfWorldDistance: Double?
   /// The same, by mode, longest first; moves with no mode count as `.unknown`.
   var distanceByMode: [ModeDistance]
   /// Region codes in the order they were first visited.
@@ -42,7 +45,8 @@ nonisolated struct TravelStatistics: Equatable, Sendable {
   static let hoursPerDay = 24
 
   /// The statistics of one year (by local day, F8), or of all records when `year` is nil.
-  init(_ input: Input, year: Int?) {
+  /// `fogOfWorld` is the estimated length of Fog of World's explored areas, if imported.
+  init(_ input: Input, year: Int?, fogOfWorld: Double? = nil) {
     let segments = input.segments.filter { year == nil || $0.localDay.year == year }
     var byMode: [TransportMode: Double] = [:]
     var minutesByHour = Array(repeating: 0.0, count: Self.hoursPerDay)
@@ -69,7 +73,8 @@ nonisolated struct TravelStatistics: Equatable, Sendable {
       .filter { $0.value > 0 }
       .map { ModeDistance(mode: $0.key, metres: $0.value) }
       .sorted { ($0.metres, $1.mode.rawValue) > ($1.metres, $0.mode.rawValue) }
-    distance = distanceByMode.map(\.metres).reduce(0, +)
+    fogOfWorldDistance = year == nil ? fogOfWorld.flatMap { $0 > 0 ? $0 : nil } : nil
+    distance = distanceByMode.map(\.metres).reduce(0, +) + (fogOfWorldDistance ?? 0)
     countries = firstVisit.sorted { ($0.value, $0.key) < ($1.value, $1.key) }.map(\.key)
     recordedDays = days.count
     firstDay = days.min()

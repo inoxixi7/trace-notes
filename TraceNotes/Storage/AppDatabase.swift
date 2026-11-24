@@ -178,6 +178,22 @@ nonisolated final class AppDatabase: Sendable {
           .check { [Place.Status.pending.rawValue, Place.Status.resolved.rawValue, Place.Status.failed.rawValue].contains($0) }
       }
     }
+    // Fog of World (F12, D54): explored pixels by block, without times, and when they were imported.
+    // Not part of the raw layer: a new import replaces them, and they can be removed.
+    migrator.registerMigration("v9") { db in
+      try db.create(table: "fog_blocks", options: .withoutRowID) { table in
+        table.column("x", .integer).notNull()  // block column, 0 ..< 65536 from 180° W
+        table.column("y", .integer).notNull()  // block row, 0 ..< 65536 from the north
+        table.column("pixels", .blob).notNull()  // FogOfWorld.StoredBlock.pixels
+        table.column("pixelCount", .integer).notNull()
+        table.column("length", .double).notNull()  // metres of centre line
+        table.primaryKey(["x", "y"])
+      }
+      try db.create(table: "fog_import") { table in
+        table.primaryKey("id", .integer).check { $0 == 1 }
+        table.column("importedAt", .integer).notNull()  // UTC milliseconds
+      }
+    }
     return migrator
   }
 
@@ -209,10 +225,11 @@ nonisolated final class AppDatabase: Sendable {
       .values(in: pool)
   }
 
-  /// The newest timestamp of any point or event, i.e. the last sign of life of the recorder.
+  /// The newest timestamp of any recorded point or event, i.e. the last sign of life of the
+  /// recorder (imported points are not).
   func lastActivity() async throws -> Date? {
     try await pool.read { db in
-      let point = try Int64.fetchOne(db, sql: "SELECT MAX(timestamp) FROM raw_points")
+      let point = try Int64.fetchOne(db, sql: "SELECT MAX(timestamp) FROM raw_points WHERE source = ?", arguments: [RawPoint.Source.recorded])
       let event = try Int64.fetchOne(db, sql: "SELECT MAX(timestamp) FROM recorder_events")
       return [point, event].compactMap { $0 }.max().map(RawPoint.date(milliseconds:))
     }
@@ -249,8 +266,7 @@ nonisolated final class AppDatabase: Sendable {
         .fetchOne(db)
       let cursor = lastComplete?.end ?? .distantPast
       let cursorMilliseconds = RawPoint.milliseconds(cursor)
-      let before = try RawPoint
-        .filter(RawPoint.Columns.timestamp < cursorMilliseconds)
+      let before = try Self.visible(RawPoint.filter(RawPoint.Columns.timestamp < cursorMilliseconds))
         .order(RawPoint.Columns.timestamp.desc, RawPoint.Columns.id.desc)
         .fetchOne(db)
       let points = try Self.points(db, in: cursor..<Date.distantFuture)
@@ -424,11 +440,13 @@ nonisolated final class AppDatabase: Sendable {
       .values(in: pool)
   }
 
-  /// The box around every completed move's track (the overview's first frame, D44); nil before the
-  /// first move completes. Re-emitted when moves complete.
-  func observeOverviewBounds() -> AsyncValueObservation<GeoBox?> {
+  /// The box around every completed move's track (the overview's first frame, D44), and around
+  /// Fog of World's explored areas when they are shown (D54 ⑧); nil before there is anything.
+  /// Re-emitted when moves complete.
+  func observeOverviewBounds(includingFogOfWorld: Bool) -> AsyncValueObservation<GeoBox?> {
     ValueObservation
       .tracking { db -> GeoBox? in
+        let fog = includingFogOfWorld ? try Self.fogOfWorldBounds(db) : nil
         guard
           let row = try Row.fetchOne(
             db, sql: """
@@ -436,10 +454,14 @@ nonisolated final class AppDatabase: Sendable {
               """),
           let minLatitude = row[0] as Int64?, let maxLatitude = row[1] as Int64?,
           let minLongitude = row[2] as Int64?, let maxLongitude = row[3] as Int64?
-        else { return nil }
+        else { return fog }
         let degrees = { (value: Int64) in Double(value) / RawPoint.coordinateScale }
-        return GeoBox(
+        let tracks = GeoBox(
           latitudes: degrees(minLatitude)...degrees(maxLatitude), longitudes: [degrees(minLongitude)...degrees(maxLongitude)])
+        guard let fog, let fogLongitudes = fog.longitudes.first, let trackLongitudes = tracks.longitudes.first else { return tracks }
+        return GeoBox(
+          latitudes: min(fog.latitudes.lowerBound, tracks.latitudes.lowerBound)...max(fog.latitudes.upperBound, tracks.latitudes.upperBound),
+          longitudes: [min(fogLongitudes.lowerBound, trackLongitudes.lowerBound)...max(fogLongitudes.upperBound, trackLongitudes.upperBound)])
       }
       .removeDuplicates()
       .values(in: pool)
@@ -538,8 +560,7 @@ nonisolated final class AppDatabase: Sendable {
   /// The newest recorded (not replayed) point at or before `instant`, as the gap explainer uses
   /// for a gap's entry (`TrackProcessor`).
   private static func usablePoint(_ db: Database, before instant: Date) throws -> RawPoint? {
-    try RawPoint
-      .filter(RawPoint.Columns.timestamp <= RawPoint.milliseconds(instant))
+    try visible(RawPoint.filter(RawPoint.Columns.timestamp <= RawPoint.milliseconds(instant)))
       .filter(sql: "(flags & ?) = 0", arguments: [RawPoint.Flags.replayed.rawValue])
       .order(RawPoint.Columns.timestamp.desc, RawPoint.Columns.id.desc)
       .fetchOne(db)
@@ -547,8 +568,7 @@ nonisolated final class AppDatabase: Sendable {
 
   /// The oldest recorded (not replayed) point at or after `instant`, a gap's exit.
   private static func usablePoint(_ db: Database, after instant: Date) throws -> RawPoint? {
-    try RawPoint
-      .filter(RawPoint.Columns.timestamp >= RawPoint.milliseconds(instant))
+    try visible(RawPoint.filter(RawPoint.Columns.timestamp >= RawPoint.milliseconds(instant)))
       .filter(sql: "(flags & ?) = 0", arguments: [RawPoint.Flags.replayed.rawValue])
       .order(RawPoint.Columns.timestamp, RawPoint.Columns.id)
       .fetchOne(db)
@@ -574,9 +594,222 @@ nonisolated final class AppDatabase: Sendable {
   private static func points(_ db: Database, in range: Range<Date>) throws -> [RawPoint] {
     let lower = RawPoint.milliseconds(range.lowerBound)
     let upper = RawPoint.milliseconds(range.upperBound)
-    return try RawPoint
-      .filter(RawPoint.Columns.timestamp >= lower && RawPoint.Columns.timestamp < upper)
+    return try visible(RawPoint.filter(RawPoint.Columns.timestamp >= lower && RawPoint.Columns.timestamp < upper))
       .order(RawPoint.Columns.timestamp, RawPoint.Columns.id)
       .fetchAll(db)
+  }
+
+  /// F9, D53 ③: where recording and an import overlap, recording wins. An imported point within
+  /// the gap interval of a recorded point is kept but takes no part in processing or display.
+  private static func visible(_ request: QueryInterfaceRequest<RawPoint>) -> QueryInterfaceRequest<RawPoint> {
+    let window = Int64(Segmenter.Parameters().gapInterval * 1000)
+    return request.filter(
+      sql: """
+        (raw_points.source = ? OR NOT EXISTS (
+          SELECT 1 FROM raw_points AS recorded
+          WHERE recorded.source = ? AND recorded.timestamp BETWEEN raw_points.timestamp - ? AND raw_points.timestamp + ?))
+        """,
+      arguments: [RawPoint.Source.recorded, RawPoint.Source.recorded, window, window])
+  }
+
+  // MARK: - GPX (F9)
+
+  struct GPXImport: Sendable, Equatable {
+    /// New points written.
+    var added: Int
+    /// Points the database already had from an earlier import (same time and position).
+    var duplicates: Int
+  }
+
+  /// Writes an import as one batch, skipping points an earlier import already wrote (F9), and
+  /// drops the segments from the earliest new point on, so the processor recomputes them with the
+  /// new points (ARCHITECTURE §5.3, §5.4). `points` must be oldest first.
+  func importGPX(_ points: [RawPoint]) async throws -> GPXImport {
+    try await pool.write { db in
+      let batch = (try Int64.fetchOne(db, sql: "SELECT MAX(importBatchID) FROM raw_points") ?? 0) + 1
+      var added: [Date] = []
+      for var point in points {
+        let exists = try RawPoint
+          .filter(RawPoint.Columns.source == RawPoint.Source.gpxImport)
+          .filter(RawPoint.Columns.timestamp == RawPoint.milliseconds(point.timestamp))
+          .filter(RawPoint.Columns.latitude == RawPoint.scaled(point.latitude))
+          .filter(RawPoint.Columns.longitude == RawPoint.scaled(point.longitude))
+          .isEmpty(db) == false
+        guard !exists else { continue }
+        point.source = .gpxImport
+        point.importBatchID = batch
+        try point.insert(db)
+        added.append(point.timestamp)
+      }
+      if let earliest = added.min() {
+        try Segment.filter(Segment.Columns.end >= RawPoint.milliseconds(earliest)).deleteAll(db)
+      }
+      return GPXImport(added: added.count, duplicates: points.count - added.count)
+    }
+  }
+
+  /// D53 ②: the points of the local days `days` as the map shows them: visible (recording wins
+  /// over imports), not replayed, within the decision accuracy. Oldest first.
+  func exportPoints(on days: ClosedRange<LocalDay>) async throws -> [RawPoint] {
+    let maximumAccuracy = Segmenter.Parameters().maximumDecisionAccuracy
+    return try await pool.read { db in
+      try Self.points(db, in: days.lowerBound.possibleInstants.lowerBound..<days.upperBound.possibleInstants.upperBound)
+        .filter {
+          !$0.flags.contains(.replayed) && $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= maximumAccuracy
+            && days.contains(LocalDay($0.timestamp, timeZoneID: $0.timeZoneID))
+        }
+    }
+  }
+
+  /// The first and last local day with any point, for "All Records" (D53 ④); nil before the first
+  /// point.
+  func pointDays() async throws -> ClosedRange<LocalDay>? {
+    try await pool.read { db in
+      guard
+        let first = try RawPoint.order(RawPoint.Columns.timestamp).fetchOne(db),
+        let last = try RawPoint.order(RawPoint.Columns.timestamp.desc).fetchOne(db)
+      else { return nil }
+      return LocalDay(first.timestamp, timeZoneID: first.timeZoneID)...LocalDay(last.timestamp, timeZoneID: last.timeZoneID)
+    }
+  }
+
+  // MARK: - Fog of World (F12, D54)
+
+  struct FogOfWorldSummary: Equatable, Sendable {
+    var importedAt: Date
+    /// Explored pixels (about 10 m across), the "cells" the settings show.
+    var pixelCount: Int
+  }
+
+  /// Replaces whatever an earlier import left with these blocks (D54 ⑥).
+  func replaceFogOfWorld(_ blocks: [FogOfWorld.StoredBlock], importedAt: Date) async throws {
+    try await pool.write { db in
+      try db.execute(sql: "DELETE FROM fog_blocks")
+      let insert = try db.makeStatement(sql: "INSERT INTO fog_blocks (x, y, pixels, pixelCount, length) VALUES (?, ?, ?, ?, ?)")
+      for block in blocks {
+        try insert.execute(arguments: [block.key.x, block.key.y, block.pixels, block.pixelCount, block.length])
+      }
+      try db.execute(
+        sql: "INSERT OR REPLACE INTO fog_import (id, importedAt) VALUES (1, ?)", arguments: [RawPoint.milliseconds(importedAt)])
+    }
+  }
+
+  /// D54 ⑦: removes the imported layer only.
+  func removeFogOfWorld() async throws {
+    try await pool.write { db in
+      try db.execute(sql: "DELETE FROM fog_blocks")
+      try db.execute(sql: "DELETE FROM fog_import")
+    }
+  }
+
+  /// The imported layer, or nil when there is none.
+  func observeFogOfWorld() -> AsyncValueObservation<FogOfWorldSummary?> {
+    ValueObservation
+      .tracking { db -> FogOfWorldSummary? in
+        guard let importedAt = try Int64.fetchOne(db, sql: "SELECT importedAt FROM fog_import WHERE id = 1") else { return nil }
+        let pixels = try Int.fetchOne(db, sql: "SELECT COALESCE(SUM(pixelCount), 0) FROM fog_blocks") ?? 0
+        return FogOfWorldSummary(importedAt: Date(timeIntervalSince1970: Double(importedAt) / 1000), pixelCount: pixels)
+      }
+      .removeDuplicates()
+      .values(in: pool)
+  }
+
+  /// D54 ④: the explored cells in `box` on the pixel grid coarsened by `shift` (cells are 2^shift
+  /// pixels across), for drawing. Cells are read whole, so some lie a little outside the box.
+  func observeFogOfWorldCells(in box: GeoBox, shift: Int) -> AsyncValueObservation<Set<FogOfWorld.Cell>> {
+    Self.fogOfWorldCells(in: box, shift: shift).values(in: pool)
+  }
+
+  /// D54 ④: the lines that draw the explored cells in `box` (`FogOfWorld.lines`), in cells of
+  /// 2^shift pixels. They are built off the main thread, with the read.
+  func observeFogOfWorldLines(in box: GeoBox, shift: Int) -> AsyncValueObservation<[[FogOfWorld.LinePoint]]> {
+    Self.fogOfWorldCells(in: box, shift: shift).map(FogOfWorld.lines(of:)).values(in: pool)
+  }
+
+  private static func fogOfWorldCells(in box: GeoBox, shift: Int) -> ValueObservation<ValueReducers.Fetch<Set<FogOfWorld.Cell>>> {
+    let ranges = blockRanges(of: box)
+    return ValueObservation
+      .tracking { db in
+        var cells = Set<FogOfWorld.Cell>()
+        for range in ranges {
+          let arguments: StatementArguments = [range.x.lowerBound, range.x.upperBound, range.y.lowerBound, range.y.upperBound]
+          if shift >= FogOfWorld.blockShift {
+            let blockShift = shift - FogOfWorld.blockShift
+            let rows = try Row.fetchAll(
+              db, sql: "SELECT DISTINCT x >> \(blockShift), y >> \(blockShift) FROM fog_blocks WHERE x BETWEEN ? AND ? AND y BETWEEN ? AND ?",
+              arguments: arguments)
+            for row in rows { cells.insert(FogOfWorld.Cell(x: row[0], y: row[1])) }
+          } else {
+            let rows = try Row.fetchAll(
+              db, sql: "SELECT x, y, pixels FROM fog_blocks WHERE x BETWEEN ? AND ? AND y BETWEEN ? AND ?", arguments: arguments)
+            for row in rows {
+              let blockX: Int = row[0]
+              let blockY: Int = row[1]
+              for index in FogOfWorld.pixelIndices(row[2]) {
+                let x = blockX * FogOfWorld.pixelsPerBlock + index % FogOfWorld.pixelsPerBlock
+                let y = blockY * FogOfWorld.pixelsPerBlock + index / FogOfWorld.pixelsPerBlock
+                cells.insert(FogOfWorld.Cell(x: Int32(x >> shift), y: Int32(y >> shift)))
+              }
+            }
+          }
+        }
+        return cells
+      }
+  }
+
+  /// The block columns and rows a box covers, one pair per longitude range.
+  private static func blockRanges(of box: GeoBox) -> [(x: ClosedRange<Int>, y: ClosedRange<Int>)] {
+    let last = FogOfWorld.pixelsPerSide - 1
+    let block = { (pixel: Double) in min(last, max(0, Int(pixel.rounded(.down)))) >> FogOfWorld.blockShift }
+    let top = block(FogOfWorld.pixel(latitude: box.latitudes.upperBound, longitude: 0).y)
+    let bottom = block(FogOfWorld.pixel(latitude: box.latitudes.lowerBound, longitude: 0).y)
+    return box.longitudes.map { longitudes in
+      let west = block(FogOfWorld.pixel(latitude: 0, longitude: longitudes.lowerBound).x)
+      let east = block(FogOfWorld.pixel(latitude: 0, longitude: longitudes.upperBound).x)
+      return (west...east, top...bottom)
+    }
+  }
+
+  /// The box around every explored block, or nil without an import.
+  private static func fogOfWorldBounds(_ db: Database) throws -> GeoBox? {
+    guard
+      let row = try Row.fetchOne(db, sql: "SELECT MIN(x), MAX(x), MIN(y), MAX(y) FROM fog_blocks"),
+      let west = row[0] as Int?, let east = row[1] as Int?, let north = row[2] as Int?, let south = row[3] as Int?
+    else { return nil }
+    let size = Double(FogOfWorld.pixelsPerBlock)
+    let northWest = FogOfWorld.coordinate(x: Double(west) * size, y: Double(north) * size)
+    let southEast = FogOfWorld.coordinate(x: Double(east + 1) * size, y: Double(south + 1) * size)
+    return GeoBox(
+      latitudes: southEast.latitude...northWest.latitude, longitudes: [northWest.longitude...southEast.longitude])
+  }
+
+  /// D54 ⑤: the estimated length of the explored areas' centre line, in metres, less the parts
+  /// within about `tolerance` of Trace Notes' own completed moves; nil without an import.
+  /// Re-emitted when a move completes or the import changes.
+  func observeFogOfWorldDistance(tolerance: Double) -> AsyncValueObservation<Double?> {
+    ValueObservation
+      .tracking { db -> Double? in
+        guard let total = try Double.fetchOne(db, sql: "SELECT SUM(length) FROM fog_blocks") else { return nil }
+        let tracks = try RenderCacheEntry.filter(RenderCacheEntry.Columns.level == 0).fetchAll(db).map(\.coordinates)
+        let own = FogOfWorld.OwnTracks(tracks: tracks, tolerance: tolerance)
+        let statement = try db.cachedStatement(sql: "SELECT pixels, pixelCount, length FROM fog_blocks WHERE x = ? AND y = ?")
+        var overlap = 0.0
+        for key in own.reachableBlocks {
+          guard let row = try Row.fetchOne(statement, arguments: [key.x, key.y]) else { continue }
+          let count: Int = row[1]
+          guard count > 0 else { continue }
+          let length: Double = row[2]
+          // The block's length shared out evenly over its pixels.
+          let covered = FogOfWorld.pixelIndices(row[0]).filter { index in
+            own.covers(
+              pixelX: Int(key.x) * FogOfWorld.pixelsPerBlock + index % FogOfWorld.pixelsPerBlock,
+              y: Int(key.y) * FogOfWorld.pixelsPerBlock + index / FogOfWorld.pixelsPerBlock)
+          }.count
+          overlap += length * Double(covered) / Double(count)
+        }
+        return max(0, total - overlap)
+      }
+      .removeDuplicates()
+      .values(in: pool)
   }
 }

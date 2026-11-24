@@ -57,6 +57,40 @@
         }
       }
     },
+    "%lld explored cells": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld explored cell"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld explored cells"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "探索済みのマス %lld 個"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个已探索格子"
+          }
+        }
+      }
+    },
     "%lld places are still being looked up": {
       "localizations": {
         "en": {
@@ -91,6 +125,108 @@
         }
       }
     },
+    "%lld points imported": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld point imported"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld points imported"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 地点を読み込みました"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已导入 %lld 个点"
+          }
+        }
+      }
+    },
+    "%lld points were already imported": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld point was already imported"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld points were already imported"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 地点はすでに読み込み済みです"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个点之前已导入"
+          }
+        }
+      }
+    },
+    "%lld points without a time or position were left out": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld point without a time or position was left out"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld points without a time or position were left out"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "時刻または位置のない %lld 地点は除外しました"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个没有时间或位置的点未导入"
+          }
+        }
+      }
+    },
     "%lld stays": {
       "localizations": {
         "en": {
@@ -121,6 +257,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld 个停留"
+          }
+        }
+      }
+    },
+    "All Records": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All Records"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "すべての記録"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全部记录"
           }
         }
       }
@@ -273,6 +431,22 @@
         }
       }
     },
+    "Choose the Sync folder in Fog of World’s iCloud Drive folder, or a zip of it. Explored areas appear in the overview and count towards the total distance; they have no times, so they stay out of the timeline. A new import replaces the old one.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud Drive の Fog of World フォルダにある Sync フォルダ、またはその zip を選んでください。探索済みのエリアは概要に表示され、総距離にも含まれます。時刻がないため、タイムラインには表示されません。読み込み直すと前のデータは置き換えられます。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择 iCloud 云盘里世界迷雾文件夹中的 Sync 文件夹，或它的 zip。已探索的区域会显示在总览里，也计入总里程；这些数据没有时间，所以不进时间线。重新导入会替换之前的数据。"
+          }
+        }
+      }
+    },
     "Countries and Regions": {
       "localizations": {
         "ja": {
@@ -349,6 +523,28 @@
         }
       }
     },
+    "Done": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完了"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成"
+          }
+        }
+      }
+    },
     "Earlier year": {
       "localizations": {
         "ja": {
@@ -387,6 +583,98 @@
         }
       }
     },
+    "Export GPX": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export GPX"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GPXを書き出す"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导出 GPX"
+          }
+        }
+      }
+    },
+    "Fog of World": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fog of World"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "世界迷雾"
+          }
+        }
+      }
+    },
+    "Fog of World (estimated)": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fog of World（推定）"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "世界迷雾（估算）"
+          }
+        }
+      }
+    },
+    "From": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開始日"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开始日期"
+          }
+        }
+      }
+    },
+    "Hidden": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "非表示"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐藏"
+          }
+        }
+      }
+    },
     "Hides the recording status": {
       "localizations": {
         "en": {
@@ -421,6 +709,104 @@
           "stringUnit": {
             "state": "translated",
             "value": "小时"
+          }
+        }
+      }
+    },
+    "Import Again": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "もう一度読み込む"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新导入"
+          }
+        }
+      }
+    },
+    "Import GPX": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import GPX"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GPXを読み込む"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入 GPX"
+          }
+        }
+      }
+    },
+    "Import from Fog of World": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fog of World から読み込む"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从世界迷雾导入"
+          }
+        }
+      }
+    },
+    "Imported points appear only where Trace Notes has no recording of its own.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Imported points appear only where Trace Notes has no recording of its own."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "読み込んだ地点は、Trace Notes 自身の記録がない時間帯にだけ表示されます。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入的点只在 Trace Notes 自己没有记录的时段显示。"
+          }
+        }
+      }
+    },
+    "Importing…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importing…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "読み込み中…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在导入…"
           }
         }
       }
@@ -759,6 +1145,22 @@
         }
       }
     },
+    "No Fog of World data was found. Choose the Sync folder in Fog of World’s iCloud Drive folder.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fog of World のデータが見つかりません。iCloud Drive の Fog of World フォルダにある Sync フォルダを選んでください。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有找到世界迷雾的数据。请选择 iCloud 云盘里世界迷雾文件夹中的 Sync 文件夹。"
+          }
+        }
+      }
+    },
     "No record": {
       "localizations": {
         "en": {
@@ -777,6 +1179,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "没有记录"
+          }
+        }
+      }
+    },
+    "No records on these days.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No records on these days."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この期間の記録はありません。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这几天没有记录。"
           }
         }
       }
@@ -847,6 +1271,28 @@
         }
       }
     },
+    "None of the points in this GPX file has both a time and a valid position, so nothing can be placed on the timeline.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "None of the points in this GPX file has both a time and a valid position, so nothing can be placed on the timeline."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このGPXファイルには、時刻と正しい位置の両方を持つ地点がないため、タイムラインに置けません。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个 GPX 文件里没有同时带时间和有效位置的点，无法放到时间线上。"
+          }
+        }
+      }
+    },
     "Not recording": {
       "localizations": {
         "en": {
@@ -865,6 +1311,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "未在记录"
+          }
+        }
+      }
+    },
+    "Nothing new to import": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing new to import"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新しく読み込む地点はありません"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有需要导入的新点"
           }
         }
       }
@@ -909,6 +1377,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "今天还没有记录"
+          }
+        }
+      }
+    },
+    "Only the explored areas you imported are removed. Your own records stay.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "読み込んだ探索済みのエリアだけが削除されます。Trace Notes の記録はそのまま残ります。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只移除导入的已探索区域，Trace Notes 自己的记录不受影响。"
           }
         }
       }
@@ -1127,6 +1611,54 @@
         }
       }
     },
+    "Remove": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "削除"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除"
+          }
+        }
+      }
+    },
+    "Remove Fog of World Data": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fog of World のデータを削除"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除世界迷雾数据"
+          }
+        }
+      }
+    },
+    "Remove Fog of World data?": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fog of World のデータを削除しますか？"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要移除世界迷雾的数据吗？"
+          }
+        }
+      }
+    },
     "Rename place": {
       "localizations": {
         "en": {
@@ -1237,6 +1769,56 @@
         }
       }
     },
+    "Share %lld points": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Share %lld point"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Share %lld points"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 地点を共有"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分享 %lld 个点"
+          }
+        }
+      }
+    },
+    "Shown": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "表示"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示"
+          }
+        }
+      }
+    },
     "Shows the recording status": {
       "localizations": {
         "en": {
@@ -1271,6 +1853,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "自 %@ 起"
+          }
+        }
+      }
+    },
+    "Some of the Fog of World data is damaged, so nothing was imported.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fog of World のデータの一部が壊れているため、何も読み込みませんでした。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "世界迷雾的数据有一部分已损坏，所以没有导入任何内容。"
           }
         }
       }
@@ -1379,6 +1977,28 @@
         }
       }
     },
+    "The file holds what the map shows: one track per day, without poor or estimated fixes.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The file holds what the map shows: one track per day, without poor or estimated fixes."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ファイルの内容は地図の表示と同じです。1日ごとに1トラックで、精度の低い地点や推定の地点は含みません。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件内容和地图显示的一致：每天一条轨迹，不含精度差或补存的点。"
+          }
+        }
+      }
+    },
     "The new name is shown for every visit to this place.": {
       "localizations": {
         "en": {
@@ -1445,6 +2065,66 @@
         }
       }
     },
+    "This GPX file has no tracks or routes.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This GPX file has no tracks or routes."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このGPXファイルにはトラックもルートもありません。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个 GPX 文件里没有轨迹或路线。"
+          }
+        }
+      }
+    },
+    "This file isn’t a GPX file, or it’s damaged.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This file isn’t a GPX file, or it’s damaged."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このファイルはGPXファイルではないか、破損しています。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个文件不是 GPX 文件，或者已经损坏。"
+          }
+        }
+      }
+    },
+    "This isn’t a folder or zip file Trace Notes can read.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trace Notes で読み込めるフォルダまたは zip ファイルではありません。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这不是 Trace Notes 能读取的文件夹或 zip 文件。"
+          }
+        }
+      }
+    },
     "Timeline": {
       "localizations": {
         "en": {
@@ -1463,6 +2143,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "时间线"
+          }
+        }
+      }
+    },
+    "To": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "終了日"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "结束日期"
           }
         }
       }
@@ -1737,6 +2439,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "移动后，轨迹会显示在这里。"
+          }
+        }
+      }
+    },
+    "about %@": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "約 %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "约 %@"
           }
         }
       }

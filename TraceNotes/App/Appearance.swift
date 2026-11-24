@@ -35,29 +35,20 @@ enum Appearance: String, CaseIterable, Identifiable {
 }
 
 /// The settings button in the map's control column (D46, D47), which draws the glass around it.
-/// Until the settings screen (VS10) exists, its menu holds the appearance choice (D40).
+/// It opens the settings screen (D53 ①), which holds the appearance choice (D40).
 struct SettingsButton: View {
   let size: CGFloat
-  @AppStorage(Appearance.storageKey) private var appearance = Appearance.system
+  let action: () -> Void
 
   var body: some View {
-    Menu {
-      Section("Appearance") {
-        Picker("Appearance", selection: $appearance) {
-          ForEach(Appearance.allCases) { option in
-            Label(option.title, systemImage: option.symbol).tag(option)
-          }
-        }
-      }
-    } label: {
+    Button(action: action) {
       Image(systemName: "gearshape")
         .font(.title3.weight(.semibold))
         .foregroundStyle(.primary)
         .frame(width: size, height: size)
         .contentShape(.rect)
     }
-    // A menu tints its label; the map's controls are all in the primary colour (D47).
-    .tint(.primary)
+    .buttonStyle(.plain)
     .accessibilityLabel(Text("Settings"))
   }
 }

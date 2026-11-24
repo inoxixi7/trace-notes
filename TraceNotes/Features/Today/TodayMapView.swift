@@ -33,6 +33,12 @@ struct TodayMapView: UIViewRepresentable {
     /// The tracks read for `request`, by segment ID; nil before the first read.
     var request: OverviewRequest?
     var tracks: [Int64: [RenderCache.Coordinate]]
+    /// Whether Fog of World's explored areas are drawn with the tracks (D54 ④⑧).
+    var showsFogOfWorld = false
+    /// The request `fogLines` were read for; nil before the first read.
+    var fogRequest: OverviewRequest?
+    /// The explored areas' lines (`FogOfWorld.lines`), in cells of 2^fogShift pixels.
+    var fogLines: [[FogOfWorld.LinePoint]] = []
   }
 
   func makeUIView(context: Context) -> MKMapView {
@@ -86,8 +92,9 @@ struct TodayMapView: UIViewRepresentable {
     private var isShowingOverview = false
     private var hasFramedOverview = false
     /// The read whose tracks are drawn, and the newest one asked for.
-    private var drawnOverview: OverviewRequest?
+    private var drawnOverview: (tracks: OverviewRequest?, fog: OverviewRequest?)?
     private var askedOverview: OverviewRequest?
+    private var showsFogOfWorld = false
     var onOverviewRequest: ((OverviewRequest) -> Void)?
     var onUserMove: (() -> Void)?
 
@@ -232,6 +239,12 @@ struct TodayMapView: UIViewRepresentable {
         canvas.setLinks([])
         canvas.redraw(on: map)
       }
+      if overview.showsFogOfWorld != showsFogOfWorld {
+        // Turned on or off: the next read needs (or drops) the explored cells.
+        showsFogOfWorld = overview.showsFogOfWorld
+        askedOverview = nil
+        if hasFramedOverview { requestOverview(on: map) }
+      }
       if !hasFramedOverview, let bounds = overview.bounds, let rect = Self.rect(of: bounds) {
         hasFramedOverview = true
         // Without animation the visible rect is final at once (and no region change is reported).
@@ -239,21 +252,49 @@ struct TodayMapView: UIViewRepresentable {
         canvas.keepAnchorsNearCentre(on: map)
         requestOverview(on: map)
       }
-      guard let request = overview.request, request != drawnOverview else { return }
-      drawnOverview = request
+      let fogRequest = overview.showsFogOfWorld ? overview.fogRequest : nil
+      guard overview.request != nil || fogRequest != nil,
+        drawnOverview.map({ $0.tracks != overview.request || $0.fog != fogRequest }) ?? true
+      else { return }
+      drawnOverview = (overview.request, fogRequest)
       var geometry = TrackGeometry<Int64>()
-      geometry.update(overview.tracks.mapValues { TrackGeometry<Int64>.Track(levels: [$0.map(DisplayProjection.shared.mapPoint)]) })
-      let origin = geometry.origin ?? MKMapPoint(x: 0, y: 0)
-      canvas.setTracks(geometry.origin.map { geometry.path(atLevel: 0, origin: $0) }, origin: origin)
+      if overview.request != nil {
+        geometry.update(overview.tracks.mapValues { TrackGeometry<Int64>.Track(levels: [$0.map(DisplayProjection.shared.mapPoint)]) })
+      }
+      let fog = fogRequest.flatMap { request in request.fogShift.map { Self.mapPoints(of: overview.fogLines, shift: $0) } } ?? []
+      guard let origin = geometry.origin ?? fog.first?.first else {
+        canvas.setTracks(nil, origin: MKMapPoint(x: 0, y: 0))
+        canvas.redraw(on: map)
+        return
+      }
+      let path = overview.request != nil ? geometry.path(atLevel: 0, origin: origin).mutableCopy() ?? CGMutablePath() : CGMutablePath()
+      // The explored areas join the tracks' path, so they are stroked as one line in one colour.
+      for line in fog {
+        let points = line.map { CGPoint(x: $0.x - origin.x, y: $0.y - origin.y) }
+        // A one-point line is a dot: a zero-length segment that the round cap draws.
+        path.addLines(between: points.count == 1 ? [points[0], points[0]] : points)
+      }
+      canvas.setTracks(path, origin: origin)
       canvas.redraw(on: map)
+    }
+
+    /// Fog of World's lines in display space (D54 ④).
+    private static func mapPoints(of lines: [[FogOfWorld.LinePoint]], shift: Int) -> [[MKMapPoint]] {
+      let size = Double(1 << shift)
+      return lines.map { line in
+        line.map { DisplayProjection.shared.mapPoint(FogOfWorld.coordinate(x: $0.x * size, y: $0.y * size)) }
+      }
     }
 
     /// Asks for the tracks of the visible area unless the last read already covers it.
     private func requestOverview(on map: MKMapView) {
       let level = Self.level(on: map)
       let visible = map.visibleMapRect
-      guard visible.width > 0, askedOverview?.covers(visible, level: level) != true else { return }
-      let request = OverviewRequest(visible: visible, level: level)
+      guard visible.width > 0, map.bounds.width > 0 else { return }
+      let fogShift = showsFogOfWorld
+        ? OverviewRequest.fogShift(pointsPerMapPoint: map.bounds.width / visible.width, lineWidth: TrackCanvas.lineWidth) : nil
+      guard askedOverview?.covers(visible, level: level, fogShift: fogShift) != true else { return }
+      let request = OverviewRequest(visible: visible, level: level, fogShift: fogShift)
       askedOverview = request
       // Called while SwiftUI updates the view (framing), so the state change waits for the next turn.
       let onOverviewRequest = onOverviewRequest

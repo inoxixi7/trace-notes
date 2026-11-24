@@ -38,11 +38,11 @@ struct OverviewTests {
 
   @Test func onlyTracksMeetingTheBoxAreRead() async throws {
     let database = try AppDatabase(url: directory.appending(path: "test.sqlite"))
-    #expect(try await first(database.observeOverviewBounds()) == nil)
+    #expect(try await first(database.observeOverviewBounds(includingFogOfWorld: false)) == nil)
     // Tokyo, Osaka, and a track crossing the antimeridian's east side (Fiji).
     try await store([levels(from: 35.6, 139.7), levels(from: 34.6, 135.4), levels(from: -17.8, 179.95, steps: 2, step: 0.02)], in: database)
 
-    let bounds = try #require(try await first(database.observeOverviewBounds()))
+    let bounds = try #require(try await first(database.observeOverviewBounds(includingFogOfWorld: false)))
     #expect(abs(bounds.latitudes.lowerBound - -17.8) < 1e-6 && abs(bounds.latitudes.upperBound - 35.63) < 1e-6)
 
     let tokyo = try await first(database.observeOverviewTracks(in: box(35.5...35.7, 139.6...139.8), level: 2))
@@ -61,7 +61,7 @@ struct OverviewTests {
     let database = try AppDatabase(url: directory.appending(path: "test.sqlite"))
     try await store([levels(from: 35.6, 139.7)], in: database)
     #expect(try await database.deleteSegments(otherThan: Segmenter.pipelineVersion + 1) == 1)
-    #expect(try await first(database.observeOverviewBounds()) == nil)
+    #expect(try await first(database.observeOverviewBounds(includingFogOfWorld: false)) == nil)
   }
 
   /// v7 fills the boxes of moves stored before it, from their finest level.
